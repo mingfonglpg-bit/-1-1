@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⚡ 極冷庫管理系統 Ultra V17</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="凍庫管理">
+    <meta name="theme-color" content="#030712">
+    
+    <link rel="apple-touch-icon" href="https://i.meee.com.tw/mAedyKQ.jpg">
+    <link rel="icon" type="image/png" href="https://i.meee.com.tw/mAedyKQ.jpg">
+
+    <link rel="manifest" href='data:application/manifest+json,{"name":"極冷庫管理系統 Ultra","short_name":"凍庫管理","description":"專業級凍庫監控與管理系統","start_url":".","display":"standalone","background_color":"#030712","theme_color":"#818cf8","icons":[{"src":"https://i.meee.com.tw/mAedyKQ.jpg","sizes":"512x512","type":"image/png"}]}'>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700;900&display=swap');
+
+        :root { 
+            --primary: #818cf8; 
+            --primary-glow: rgba(129, 140, 248, 0.5);
+            --accent: #34d399;
+            --warning: #fbbf24; 
+            --danger: #f87171; 
+            --expired: #c084fc; 
+            --bg-base: #030712; 
+            --glass-bg: rgba(17, 24, 39, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --admin: #a78bfa;
+        }
+        
+        * { box-sizing: border-box; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: 'Inter', "Noto Sans TC", sans-serif; 
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15), transparent 25%), 
+                radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.15), transparent 25%),
+                radial-gradient(circle at 50% 0%, rgba(52, 211, 153, 0.1), transparent 30%);
+            color: var(--text-main); margin: 0; min-height: 100vh; overflow-x: hidden;
+            /* 修正 iOS 橡皮筋回彈背景色 */
+            overscroll-behavior-y: none;
+        }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #a5b4fc, #d8b4fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+        }
+
+        #offline-banner { display: none; background: linear-gradient(90deg, #d97706, #fbbf24); color: #000; text-align: center; padding: 12px; font-size: 13px; font-weight: 800; position: sticky; top: 0; z-index: 9999; }
+
+        /* --- 歡迎頁面 --- */
+        #welcome-page { position: fixed; inset: 0; background: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+        .welcome-sticker { width: 140px; border-radius: 40px; margin-bottom: 2rem; box-shadow: 0 20px 50px rgba(129, 140, 248, 0.4); animation: float 4s ease-in-out infinite; border: 2px solid rgba(255,255,255,0.1); }
+        @keyframes float { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-15px) scale(1.02); } }
+        
+        /* --- 主容器 --- */
+        .container { width: 96%; max-width: 1200px; margin: 20px auto; background: var(--glass-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); padding: 25px; border-radius: 32px; border: 1px solid var(--glass-border); display: none; box-shadow: 0 30px 60px rgba(0,0,0,0.5); padding-bottom: 50px; }
+        
+        /* --- 統計與地圖 --- */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stat-card { padding: 20px; border-radius: 22px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); position: relative; }
+        .stat-val { font-size: 32px; font-weight: 900; margin: 8px 0; color: #fff; text-shadow: 0 0 15px var(--primary-glow); }
+
+        .grid-container { display: grid; grid-template-columns: repeat(11, 1fr); gap: 10px; margin-top: 15px; }
+        .slot { 
+            aspect-ratio: 1; border-radius: 14px; font-size: 11px; 
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            cursor: pointer; color: var(--text-dim); position: relative;
+        }
+        .slot b { font-size: 15px; font-weight: 800; color: rgba(255,255,255,0.4); }
+        .slot.occupied { border-color: var(--primary); background: rgba(129,140,248,0.15); }
+        .slot.occupied b { color: #fff; text-shadow: 0 0 8px var(--primary); }
+        .slot.status-near { border-color: var(--warning); background: rgba(251,191,36,0.15); }
+        .slot.status-near b { color: var(--warning); }
+        .slot.status-expired { border-color: var(--expired); background: rgba(192,132,252,0.15); }
+        .slot.status-expired b { color: var(--expired); }
+        .slot.status-scrapped { border-color: var(--danger); background: rgba(248,113,113,0.15); }
+        .slot.status-scrapped b { color: var(--danger); }
+
+        /* --- 搜尋與表格 --- */
+        .search-box { width: 100%; padding: 18px 24px; border: 1px solid var(--glass-border); border-radius: 20px; background: rgba(0,0,0,0.3); color: white; font-size: 16px; margin-bottom: 25px; outline: none; }
+        .search-box:focus { border-color: var(--primary); background: rgba(129,140,248,0.05); }
+        
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; min-width: 800px; }
+        td { padding: 18px; background: rgba(255,255,255,0.03); border-top: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+        td:first-child { border-radius: 18px 0 0 18px; }
+        td:last-child { border-radius: 0 18px 18px 0; }
+
+        /* --- 按鈕樣式 --- */
+        .btn { padding: 12px 20px; border-radius: 14px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.03); color: white; cursor: pointer; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; box-shadow: 0 8px 20px rgba(99,102,241,0.25); }
+
+        /* --- Toast & Modal --- */
+        #toast-container { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 99999; width: 85%; max-width: 350px; pointer-events: none; }
+        .toast { background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(10px); color: white; padding: 14px 20px; border-radius: 50px; font-size: 14px; font-weight: 700; text-align: center; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; animation: slideDown 0.4s forwards; }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 12000; justify-content: center; align-items: center; backdrop-filter: blur(15px); padding: 20px; }
+        .modal-content { background: #111827; padding: 30px; border-radius: 28px; width: 100%; max-width: 400px; border: 1px solid rgba(255,255,255,0.1); }
+        .form-control { width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); color: white; border: 1px solid var(--glass-border); }
+
+        #loader { display: none; position: fixed; inset: 0; background: rgba(3,7,18,0.85); z-index: 13000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .spinner { width: 50px; height: 50px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) { 
+            .grid-container { grid-template-columns: repeat(6, 1fr); gap: 8px; } 
+            .stats-grid { grid-template-columns: 1fr; }
+            .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 15px; }
+            .welcome-title { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="offline-banner">📡 目前為離線狀態：僅供檢視</div>
+<div id="toast-container"></div>
+
+<div id="welcome-page">
+    <img src="https://i.meee.com.tw/mAedyKQ.jpg" class="welcome-sticker" alt="Logo">
+    <h1 class="welcome-title text-gradient">凍庫監控系統<br>ULTRA V17</h1>
+    <p style="color: rgba(255,255,255,0.4); margin-bottom: 40px; font-weight: 300; letter-spacing: 2px;">行動管理整合版</p>
+    <button class="btn btn-primary" style="padding: 18px 60px; font-size: 18px; border-radius: 50px; font-weight: 800;" onclick="enterSystem()">啟動系統</button>
+</div>
+
+<div class="container" id="main-container">
+    <header style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:30px;">
+        <div>
+            <h2 class="text-gradient" style="margin:0; font-size: 24px;">❄️ CryoCenter</h2>
+            <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">SYSTEM OPERATIONAL</div>
+        </div>
+        <div class="header-actions">
+            <button onclick="fetchData()" class="btn">🔄 同步</button>
+            <button id="adminToggleBtn" onclick="showAdminLogin()" class="btn" style="color:#d8b4fe;">🛠️ 管理</button>
+        </div>
+    </header>
+
+    <div id="admin-panel" style="display:none; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); padding: 20px; border-radius: 22px; margin-bottom: 30px;">
+        <h4 style="margin:0 0 15px 0; color: #d8b4fe;">⚡ 快速入庫</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <select id="addZone" class="form-control"><option value="左">左庫</option><option value="右">右庫</option></select>
+            <select id="addFloor" class="form-control"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
+            <input type="number" id="addPos" placeholder="位置" class="form-control">
+            <input type="text" id="addName" placeholder="品名" class="form-control">
+            <input type="text" id="addBatch" placeholder="批號" class="form-control">
+            <input type="date" id="addDate" class="form-control">
+            <button onclick="commitAdd()" class="btn btn-primary" style="grid-column: span 2;">確認入庫</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div style="color:var(--text-dim); font-size:12px;">總容量</div>
+            <div id="totalRate" class="stat-val">0%</div>
+        </div>
+        <div class="stat-card">
+            <div style="color:var(--text-dim); font-size:12px;">左庫</div>
+            <div id="leftRate" class="stat-val">0%</div>
+        </div>
+        <div class="stat-card">
+            <div style="color:var(--text-dim); font-size:12px;">右庫</div>
+            <div id="rightRate" class="stat-val">0%</div>
+        </div>
+    </div>
+
+    <section style="margin-bottom: 35px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h4 style="margin:0;">📍 視覺面板: <span id="mapTitle" style="color:var(--primary);">...</span></h4>
+            <div style="display:flex; gap:5px;">
+                <select id="vZone" onchange="renderVisual()" class="btn" style="border:none; padding:5px;"><option value="左">左</option><option value="右">右</option></select>
+                <select id="vFloor" onchange="renderVisual()" class="btn" style="border:none; padding:5px;"><option value="
