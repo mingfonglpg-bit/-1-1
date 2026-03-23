@@ -26,23 +26,18 @@
             color: var(--text-main); margin: 0; min-height: 100vh; overflow-x: hidden;
         }
 
-        /* --- ⚠️ 離線狀態條 --- */
         #offline-banner { display: none; background: var(--warning); color: #000; text-align: center; padding: 6px; font-size: 13px; font-weight: 800; position: sticky; top: 0; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
 
-        /* --- 🌑 歡迎頁面 --- */
         #welcome-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .welcome-sticker { width: 140px; border-radius: 30px; margin-bottom: 2rem; box-shadow: 0 0 40px var(--primary-glow); animation: float 3s ease-in-out infinite; }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
 
-        /* --- 🧊 主容器 --- */
         .container { width: 95%; max-width: 1200px; margin: 15px auto; background: var(--card-bg); backdrop-filter: blur(20px); padding: 25px; border-radius: 28px; border: 1px solid var(--border); display: none; box-shadow: 0 25px 50px rgba(0,0,0,0.6); }
 
-        /* --- 📊 統計卡片 --- */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 25px; }
         .stat-card { padding: 18px; border-radius: 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); text-align: center; }
         .stat-val { font-size: 24px; font-weight: 800; margin: 5px 0; color: var(--primary); text-shadow: 0 0 10px var(--primary-glow); }
 
-        /* --- 📍 儲位地圖 --- */
         .grid-container { display: grid; grid-template-columns: repeat(11, 1fr); gap: 8px; margin-top: 10px; }
         .slot { 
             aspect-ratio: 1; border-radius: 10px; font-size: 10px; 
@@ -53,19 +48,20 @@
         .slot b { font-size: 13px; color: var(--text-main); }
         .slot.occupied { background: var(--primary); color: white; border: none; }
         
-        /* 顏色分級 */
         .slot.status-scrapped { background: var(--danger) !important; box-shadow: 0 0 12px var(--danger); }
         .slot.status-expired { background: var(--expired) !important; box-shadow: 0 0 12px var(--expired); }
         .slot.status-near { background: var(--warning) !important; box-shadow: 0 0 12px var(--warning); color: #000 !important; }
         .slot.status-near b { color: #000 !important; }
 
-        /* --- 🖼️ 回報彈窗 --- */
         #report-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 12000; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
         .modal-content { background: #1e293b; padding: 30px; border-radius: 24px; width: 90%; max-width: 420px; border: 1px solid var(--border); }
 
-        /* --- 📜 表格與搜尋 --- */
-        .search-box { width: 100%; padding: 14px 20px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,0.05); color: white; font-size: 16px; margin-bottom: 20px; outline: none; }
+        /* --- 修正搜尋欄容器與清除按鈕 --- */
+        .search-container { position: relative; width: 100%; margin-bottom: 20px; }
+        .search-box { width: 100%; padding: 14px 45px 14px 20px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,0.05); color: white; font-size: 16px; outline: none; margin-bottom: 0; }
         .search-box:focus { border-color: var(--primary); background: rgba(255,255,255,0.08); }
+        .clear-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); font-size: 22px; display: none; user-select: none; font-weight: bold; }
+        .clear-btn:hover { color: var(--danger); }
         
         .table-wrapper { border-radius: 16px; overflow-x: auto; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
         table { width: 100%; border-collapse: collapse; min-width: 700px; }
@@ -129,9 +125,9 @@
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
             <select id="addZone" class="btn"><option value="左">左庫</option><option value="右">右庫</option></select>
             <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
-            <input type="number" id="addPos" placeholder="儲位" class="search-box" style="margin:0;">
-            <input type="text" id="addName" placeholder="品名" class="search-box" style="margin:0;">
-            <input type="text" id="addBatch" placeholder="批號" class="search-box" style="margin:0;">
+            <input type="number" id="addPos" placeholder="儲位" class="search-box" style="margin:0; padding:10px;">
+            <input type="text" id="addName" placeholder="品名" class="search-box" style="margin:0; padding:10px;">
+            <input type="text" id="addBatch" placeholder="批號" class="search-box" style="margin:0; padding:10px;">
             <input type="date" id="addDate" class="btn">
             <button onclick="commitAdd()" class="btn" style="background:#8b5cf6;">執行入庫</button>
         </div>
@@ -154,7 +150,10 @@
         <div id="visualGrid" class="grid-container"></div>
     </section>
 
-    <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜尋 品名、位置、批號、備註 (自動過濾)..." oninput="debounceSearch()">
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜尋 品名、位置、批號、備註 (自動過濾)..." oninput="handleSearchInput()">
+        <span id="clearSearch" class="clear-btn" onclick="clearSearch()">×</span>
+    </div>
 
     <div class="table-wrapper">
         <table>
@@ -177,7 +176,6 @@
     const _KEY = "YWRtaW4xMjM="; 
     let inventory = [], isAdmin = false, currentPage = 1, pageSize = 10, isOffline = false, searchTimer;
 
-    // --- 系統初始化 ---
     function enterSystem() { 
         document.getElementById('welcome-page').style.display = 'none'; 
         document.getElementById('main-container').style.display = 'block'; 
@@ -186,7 +184,6 @@
         fetchData(); 
     }
 
-    // --- 離線模式控制 ---
     function toggleOfflineMode() {
         isOffline = !isOffline;
         const btn = document.getElementById('offlineBtn');
@@ -198,7 +195,6 @@
         }
     }
 
-    // --- 核心資料獲取 ---
     async function fetchData() {
         if (isOffline) return;
         toggleLoader(true, "雲端同步中...");
@@ -221,16 +217,29 @@
         toggleLoader(false);
     }
 
-    // --- 統一渲染入口 ---
     function renderAll() { updateStats(); renderVisual(); renderTable(); }
 
-    // --- 搜尋防抖 (UX 優化) ---
+    // --- 新增：搜尋輸入處理 ---
+    function handleSearchInput() {
+        const input = document.getElementById('searchInput');
+        const clearBtn = document.getElementById('clearSearch');
+        clearBtn.style.display = input.value ? 'block' : 'none';
+        debounceSearch();
+    }
+
+    // --- 新增：清除搜尋功能 ---
+    function clearSearch() {
+        const input = document.getElementById('searchInput');
+        input.value = '';
+        handleSearchInput();
+        input.focus();
+    }
+
     function debounceSearch() {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => { currentPage = 1; renderTable(); }, 300);
     }
 
-    // --- 狀態判定邏輯 (邏輯優化) ---
     function getItemStatus(item) {
         if ((item.note || "").includes("報廢")) return { type:'scrapped', cls:'status-scrapped', label:'🚫 報廢' };
         if (!item.date) return { type:'normal', cls:'occupied', label:'正常' };
@@ -240,7 +249,6 @@
         return { type:'normal', cls:'occupied', label:'正常' };
     }
 
-    // --- 表格渲染 ---
     function renderTable() {
         const body = document.getElementById('tableBody');
         const kw = document.getElementById('searchInput').value.toLowerCase();
@@ -276,7 +284,6 @@
         document.getElementById('nextBtn').disabled = (currentPage === totalPages);
     }
 
-    // --- 地圖渲染 (Tooltip 優化) ---
     function renderVisual() {
         const grid = document.getElementById('visualGrid'), zone = document.getElementById('vZone').value, floor = document.getElementById('vFloor').value;
         document.getElementById('mapTitle').innerText = `${zone}庫 ${floor}`;
@@ -288,14 +295,11 @@
             slot.className = 'slot';
             
             if (items.length > 0) {
-                // 取該儲位最嚴重的狀態作為顯示顏色
                 const statuses = items.map(it => getItemStatus(it));
                 if (statuses.some(s => s.type === 'scrapped')) slot.classList.add('status-scrapped');
                 else if (statuses.some(s => s.type === 'expired')) slot.classList.add('status-expired');
                 else if (statuses.some(s => s.type === 'near')) slot.classList.add('status-near');
                 else slot.classList.add('occupied');
-                
-                // Tooltip 預覽功能
                 slot.title = `內容物：\n` + items.map(it => `- ${it.name} (${it.batch || '無批號'})`).join('\n');
             }
 
@@ -305,14 +309,14 @@
                     document.getElementById('addZone').value = zone; document.getElementById('addFloor').value = floor;
                     document.getElementById('addPos').value = i; document.getElementById('addName').focus();
                 } else {
-                    document.getElementById('searchInput').value = `${zone}${floor}-${i}`; debounceSearch();
+                    document.getElementById('searchInput').value = `${zone}${floor}-${i}`;
+                    handleSearchInput(); // 觸發 X 顯示
                 }
             };
             grid.appendChild(slot);
         }
     }
 
-    // --- 統計更新 ---
     function updateStats() {
         const count = (z) => new Set(inventory.filter(i => (z ? i.zone === z : true) && i.pos).map(i => `${i.zone}${i.floor}-${i.pos}`)).size;
         document.getElementById('totalRate').innerText = Math.round(count(null)/176*100) + "%";
@@ -323,7 +327,6 @@
         document.getElementById('rightDetail').innerText = `${count("右")} / 88`;
     }
 
-    // --- 回報功能 ---
     function openReport(pos) {
         if(isOffline) return alert("離線模式無法送出回報");
         document.getElementById('reportTarget').innerText = "目標位置：" + pos;
@@ -350,7 +353,6 @@
         toggleLoader(false);
     }
 
-    // --- 輔助功能 ---
     function changePage(step) { currentPage += step; renderTable(); }
     function toggleLoader(s, t) { document.getElementById('loader-text').innerText = t; document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
     function toggleAdmin() {
