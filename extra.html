@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 倉儲監控系統 V17.8 Pro</title>
+    <style>
+        :root { 
+            --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
+            --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
+            --select-bg: #1e293b; --select-text: #c7d2fe;
+        }
+        * { box-sizing: border-box; transition: all 0.2s; }
+        body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; }
+        
+        .container { width: 95%; max-width: 1400px; margin: 20px auto; background: var(--card-bg); backdrop-filter: blur(20px); padding: 25px; border-radius: 28px; border: 1px solid var(--border); display: none; }
+        
+        /* 表單與選擇鈕 */
+        select.btn, input.btn { background: var(--select-bg) !important; color: var(--select-text) !important; border: 1px solid var(--border); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-size: 14px; }
+
+        /* 使用率標籤 */
+        .usage-badge { background: rgba(99, 102, 241, 0.15); color: var(--primary); padding: 8px 16px; border-radius: 12px; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.2); }
+
+        /* 2D 地圖儲位 */
+        .slot { aspect-ratio: 1; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
+        .slot.occupied { background: var(--primary); color: white; }
+        .slot.status-warning { background: var(--warning) !important; box-shadow: 0 0 10px var(--warning); }
+        .slot.status-danger { background: var(--danger) !important; box-shadow: 0 0 10px var(--danger); }
+
+        /* --- 表格間距優化核心 CSS --- */
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; margin-top: 15px; }
+        th { color: var(--text-dim); padding: 15px 20px; text-align: left; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+        td { 
+            padding: 22px 20px; /* 大量增加上下留白 */
+            background: rgba(255, 255, 255, 0.03); 
+            border-top: 1px solid var(--border); 
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        td:first-child { border-left: 1px solid var(--border); border-radius: 15px 0 0 15px; }
+        td:last-child { border-right: 1px solid var(--border); border-radius: 0 15px 15px 0; }
+        
+        td b { display: block; font-size: 16px; color: var(--text-main); margin-bottom: 4px; }
+        .report-label { display: inline-block; margin-top: 6px; padding: 4px 10px; font-size: 11px; background: rgba(245, 158, 11, 0.15); color: var(--warning); border-radius: 6px; font-weight: bold; }
+        /* -------------------------- */
+
+        /* 搜尋框與 X */
+        .search-wrapper { position: relative; margin: 25px 0 15px 0; }
+        .search-clear { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); font-size: 22px; display: none; }
+        .search-clear:hover { color: white; }
+
+        .btn-main { padding: 10px 20px; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-main:hover { opacity: 0.8; transform: translateY(-1px); }
+        
+        /* 彈窗 */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:11000; justify-content:center; align-items:center; backdrop-filter: blur(5px); }
+        .modal-content { background:var(--select-bg); padding:30px; border-radius:28px; width:90%; max-width:480px; border:1px solid var(--primary); }
+
+        /* 分頁 */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 30px; padding-bottom: 40px; }
+        .page-btn { padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--select-bg); color: white; cursor: pointer; }
+        .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        #loader { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:12000; justify-content:center; align-items:center; color:white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="loader">⚙️ 資料處理中...</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:var(--edit); margin-top:0;">📝 編輯庫存數據</h3>
+        <input type="hidden" id="editId">
+        <div style="margin-bottom:15px;"><label style="font-size:12px; color:var(--text-dim);">產品名稱</label><input type="text" id="editName" class="btn"></div>
+        <div style="margin-bottom:15px;"><label style="font-size:12px; color:var(--text-dim);">批號</label><input type="text" id="editBatch" class="btn"></div>
+        <div style="margin-bottom:15px;"><label style="font-size:12px; color:var(--text-dim);">有效日期</label><input type="date" id="editDate" class="btn"></div>
+        <div style="margin-bottom:15px;"><label style="font-size:12px; color:var(--text-dim);">備註說明</label><input type="text" id="editNote" class="btn"></div>
+        <div style="display:flex; gap:12px; margin-top:25px;">
+            <button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('editModal')">取消</button>
+            <button class="btn-main" style="background:var(--edit); flex:1;" onclick="submitEdit()">儲存更新</button>
+        </div>
+    </div>
+</div>
+
+<div id="reportModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:var(--primary); margin-top:0;">🚩 狀態回報</h3>
+        <select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">🚫 報廢</option><option value="異常">⚠️ 異常</option><option value="正常">✅ 正常</option><option value="移位">📦 移位</option></select>
+        <input type="text" id="reportReason" class="btn" placeholder="請輸入回報原因或說明...">
+        <div style="display:flex; gap:12px; margin-top:25px;">
+            <button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('reportModal')">取消</button>
+            <button class="btn-main" style="flex:1;" onclick="submitReport()">提交</button>
+        </div>
+    </div>
+</div>
+
+<div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
+    <h1 style="letter-spacing: 4px; font-size: 2.5rem; margin-bottom: 10px;">庫位監控系統 <span style="color:var(--primary)">V17.8</span></h1>
+    <p style="color: var(--text-dim); margin-bottom: 30px;">Cold Storage & Inventory Management System</p>
+    <button class="btn-main" style="padding: 20px 80px; border-radius:50px; font-size: 1.2rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);" onclick="enterSystem()">啟動系統</button>
+</div>
+
+<div class="container" id="main-container">
+    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+        <h2 style="margin:0; letter-spacing: 1px;">📦 庫位監控系統</h2>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <div id="usageInfo" class="usage-badge">使用率: 計算中...</div>
+            <button onclick="fetchData()" class="btn-main" style="background:#334155;">🔄 刷新</button>
+            <button id="adminBtn" onclick="toggleAdmin()" class="btn-main" style="background:rgba(167,139,250,0.1); color:#a78bfa;">🛠️ 管理員</button>
+        </div>
+    </header>
+
+    <div id="admin-panel" style="display:none; background:rgba(99,102,241,0.05); padding:25px; border-radius:24px; border:1px solid var(--primary); margin-bottom:25px;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:12px;">
+            <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+            <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
+            <input type="number" id="addPos" placeholder="儲位編號" class="btn"><input type="text" id="addName" placeholder="產品名稱" class="btn"><input type="text" id="addBatch" placeholder="生產批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn">
+            <button onclick="commitAdd()" class="btn-main" style="justify-content:center;">➕ 入庫</button>
+        </div>
+    </div>
+
+    <section style="background: rgba(255,255,255,0.02); padding: 25px; border-radius: 24px; border: 1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <b id="mapTitle" style="color:var(--primary); font-size: 18px;">載入區域地圖...</b>
+            <div style="display:flex; gap:10px;">
+                <select id="vZone" onchange="renderVisual()" class="btn" style="width:140px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+                <select id="vFloor" onchange="renderVisual()" class="btn" style="width:90px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
+            </div>
+        </div>
+        <div id="visualGrid" style="display:grid; gap:10px;"></div>
+    </section>
+
+    <div class="search-wrapper">
+        <input type="text" id="searchInput" class="btn" style="height: 60px; font-size: 16px; padding-left: 20px;" placeholder="🔍 快速搜尋品名、批號、儲位 (例如: 1F-05)..." oninput="handleSearchInput()">
+        <span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table>
+            <thead><tr><th>儲位位置</th><th>產品內容</th><th>有效日期</th><th>批號</th><th>備註狀態</th><th>功能操作</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="pagination" id="paginationCtrl"></div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec"; 
+    const _KEY = "YWRtaW4xMjM="; 
+    let inventory = [], zoneConfigs = {}, isAdmin = false, currentId = null;
+    let currentPage = 1, rowsPerPage = 10; // 固定顯示 10 筆
+
+    function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); }
+
+    async function fetchData() {
+        toggleLoader(true);
+        try {
+            const res = await fetch(SCRIPT_URL);
+            const data = await res.json();
+            inventory = data.inventory;
+            zoneConfigs = data.configs;
+            renderAll();
+        } catch (e) { alert("無法連線至資料庫，請檢查網路或 GAS 網址。"); }
+        toggleLoader(false);
+    }
+
+    function renderAll() { renderVisual(); renderTable(); }
+
+    function renderVisual() {
+        const grid = document.getElementById('visualGrid');
+        const zone = document.getElementById('vZone').value;
+        const floor = document.getElementById('vFloor').value;
+        const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
+
+        document.getElementById('mapTitle').innerText = `📍 ${zone} - ${floor}`;
+        grid.style.gridTemplateColumns = `repeat(${config.cols}, 1fr)`;
+        grid.innerHTML = '';
+
+        for (let i = 1; i <= config.maxPos; i++) {
+            const items = inventory.filter(d => d.zone === zone && d.floor === floor && d.pos == i);
+            const slot = document.createElement('div');
+            let statusClass = '';
+            if (items.length > 0) {
+                statusClass = 'occupied';
+                if (items.some(item => (item.note || "").includes("報廢"))) statusClass = 'status-danger';
+                else if (items.some(item => (item.note || "").includes("異常"))) statusClass = 'status-warning';
+            }
+            slot.className = `slot ${statusClass}`;
+            slot.innerHTML = `<b>${i}</b>${items.length > 0 ? `<span style="font-size:9px;">${items.length}件</span>` : ''}`;
+            slot.onclick = () => { document.getElementById('searchInput').value = `${zone}${floor}-${i}`; handleSearchInput(); };
+            grid.appendChild(slot);
+        }
+
+        const zoneItems = inventory.filter(i => i.zone === zone);
+        const occupiedCount = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
+        const totalPos = config.maxPos * 4;
+        document.getElementById('usageInfo').innerText = `使用率: ${((occupiedCount/totalPos)*100).toFixed(1)}%`;
+    }
+
+    function renderTable() {
+        const kw = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = inventory.filter(i => `${i.zone}${i.floor}-${i.pos}${i.name}${i.batch}`.toLowerCase().includes(kw));
+        
+        const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        const start = (currentPage - 1) * rowsPerPage;
+        const pagedData = filtered.slice(start, start + rowsPerPage);
+
+        document.getElementById('tableBody').innerHTML = pagedData.map(i => `
+            <tr>
+                <td><span style="color:var(--primary); font-weight:bold; font-size:16px;">${i.floor}-${i.pos}</span><br><small style="color:var(--text-dim)">${i.zone}</small></td>
+                <td><b>${i.name}</b>${i.note ? `<span class="report-label">⚠️ ${i.note}</span>` : ''}</td>
+                <td><span style="font-family: monospace;">${i.date ? i.date.split('T')[0] : '-'}</span></td>
+                <td><code style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:6px; font-size:13px;">${i.batch}</code></td>
+                <td><small style="color:var(--text-dim)">${i.note ? '📄 查看詳細' : '無紀錄'}</small></td>
+                <td>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn-main" style="background:#475569;" onclick="openReport('${i.id}')">回報</button>
+                        ${isAdmin ? `
+                            <button class="btn-main" style="background:var(--edit);" onclick="openEdit('${i.id}')">編輯</button>
+                            <button class="btn-main" style="background:var(--danger);" onclick="deleteItem('${i.id}')">刪除</button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" style="text-align:center; padding:50px; color:var(--text-dim);">📭 沒有找到符合條件的資料</td></tr>';
+        renderPagination(totalPages, filtered.length);
+    }
+
+    function renderPagination(total, items) {
+        const ctrl = document.getElementById('paginationCtrl');
+        ctrl.innerHTML = `
+            <button class="page-btn" onclick="changePage(1)" ${currentPage===1?'disabled':''}>首頁</button>
+            <button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage===1?'disabled':''}>上一頁</button>
+            <span style="font-size:14px; color:var(--text-dim); font-weight:bold;">第 ${currentPage} / ${total} 頁 (共${items}筆)</span>
+            <button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===total?'disabled':''}>下一頁</button>
+            <button class="page-btn" onclick="changePage(${total})" ${currentPage===total?'disabled':''}>末頁</button>
+        `;
+    }
+
+    function changePage(p) { currentPage = p; renderTable(); window.scrollTo({top: document.getElementById('searchInput').offsetTop - 20, behavior:'smooth'}); }
+
+    function handleSearchInput() {
+        document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none';
+        currentPage = 1; renderTable();
+    }
+
+    function clearSearch() { document.getElementById('searchInput').value = ''; handleSearchInput(); }
+
+    function openEdit(id) {
+        const item = inventory.find(i => i.id.toString() === id.toString());
+        if(!item) return;
+        document.getElementById('editId').value = id;
+        document.getElementById('editName').value = item.name;
+        document.getElementById('editBatch').value = item.batch;
+        document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : '';
+        document.getElementById('editNote').value = item.note || '';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    async function submitEdit() {
+        const data = { action: 'edit', id: document.getElementById('editId').value, name: document.getElementById('editName').value, batch: document.getElementById('editBatch').value, date: document.getElementById('editDate').value, note: document.getElementById('editNote').value };
+        toggleLoader(true);
+        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(data) });
+        closeModal('editModal'); fetchData();
+    }
+
+    async function submitReport() {
+        const type = document.getElementById('reportType').value;
+        const reason = document.getElementById('reportReason').value;
+        if(!reason) return alert("請填寫內容");
+        toggleLoader(true);
+        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'report', id:currentId, type, reason}) });
+        closeModal('reportModal'); fetchData();
+    }
+
+    async function commitAdd() {
+        const d = { action:"add", zone:document.getElementById('addZone').value, floor:document.getElementById('addFloor').value, pos:document.getElementById('addPos').value, name:document.getElementById('addName').value, batch:document.getElementById('addBatch').value, date:document.getElementById('addDate').value, note:document.getElementById('addNote').value };
+        if(!d.name || !d.pos) return alert("名稱與儲位為必填");
+        toggleLoader(true);
+        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(d) });
+        fetchData();
+    }
+
+    async function deleteItem(id) {
+        if(!confirm("⚠️ 確定要永久刪除這筆庫存紀錄嗎？")) return;
+        toggleLoader(true);
+        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'delete', id}) });
+        fetchData();
+    }
+
+    function toggleAdmin() {
+        if(!isAdmin) {
+            const p = prompt("請輸入系統管理金鑰:");
+            if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(); }
+            else { alert("金鑰錯誤"); }
+        } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(); }
+    }
+
+    function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
+    function closeModal(m) { document.getElementById(m).style.display = 'none'; }
+    function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
+</script>
+</body>
+</html>
