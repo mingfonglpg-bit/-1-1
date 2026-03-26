@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V18.0 Pro</title>
+    <title>⚡ 倉儲庫位控管系統 V18.2 Pro</title>
     <style>
         /* --- 基礎樣式 (禁止變更) --- */
         :root { 
@@ -11,12 +11,14 @@
             --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
             --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
             --select-bg: #1e293b; --select-text: #c7d2fe;
-            /* 儲位區域專屬配色 */
-            --color-polar-l: #38bdf8; /* 極冷左: 天藍 */
-            --color-polar-r: #818cf8; /* 極冷右: 靛藍 */
-            --color-cool-l:  #fbbf24; /* 冷藏左: 琥珀 */
-            --color-cool-r:  #fb7185; /* 冷藏右: 玫瑰 */
-            --color-normal:  #34d399; /* 常溫區: 翠綠 */
+            /* 區域專屬配色 */
+            --color-polar-l: #38bdf8;
+            --color-polar-r: #818cf8;
+            --color-cool-l:  #fbbf24;
+            --color-cool-r:  #fb7185;
+            --color-normal:  #34d399;
+            /* 特殊狀態顏色 */
+            --color-cut:     #a855f7; /* (切) 產品專用色：紫色 */
         }
         * { box-sizing: border-box; transition: all 0.2s; }
         body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; }
@@ -27,6 +29,7 @@
         .slot.occupied { background: var(--primary); color: white; }
         .slot.status-warning { background: var(--warning) !important; }
         .slot.status-danger { background: var(--danger) !important; }
+        .slot.status-cut { background: var(--color-cut) !important; color: white; font-weight: bold; }
         
         table { width: 100%; border-collapse: separate; border-spacing: 0 10px; margin-top: 15px; }
         th { color: var(--text-dim); padding: 15px 20px; text-align: left; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
@@ -44,21 +47,15 @@
         .page-btn { padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--select-bg); color: white; cursor: pointer; }
         #loader { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:12000; justify-content:center; align-items:center; color:white; font-weight: bold; }
 
-        /* --- 📱 手機版專屬優化 (僅針對小螢幕生效) --- */
         @media screen and (max-width: 768px) {
             .container { padding: 15px; border-radius: 20px; }
             header { flex-direction: column; align-items: flex-start !important; gap: 15px; }
-            .usage-badge { width: 100%; text-align: center; }
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
             tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 15px; overflow: hidden; }
-            td { padding: 12px 15px; text-align: right; border: none !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; position: relative; display: flex; justify-content: space-between; align-items: center; border-radius: 0 !important; }
-            td:last-child { border-bottom: none !important; }
-            td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; font-weight: normal; }
-            td b { margin-bottom: 0; font-size: 14px; text-align: right; }
+            td { padding: 12px 15px; text-align: right; border: none !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; position: relative; display: flex; justify-content: space-between; align-items: center; }
+            td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; }
             .action-btns { justify-content: flex-end; width: 100%; }
-            .search-wrapper input.btn { height: 50px; font-size: 14px; }
-            .pagination { flex-wrap: wrap; font-size: 12px; }
         }
     </style>
 </head>
@@ -80,7 +77,7 @@
         </div>
         <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">儲位編號</label><input type="number" id="editPos" class="btn"></div>
         <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">產品名稱</label><input type="text" id="editName" class="btn"></div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">批號</label><input type="text" id="editBatch" class="btn"></div>
+        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">批號碼</label><input type="text" id="editBatch" class="btn"></div>
         <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">有效日期</label><input type="date" id="editDate" class="btn"></div>
         <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">備註說明</label><input type="text" id="editNote" class="btn"></div>
         <div style="display:flex; gap:12px; margin-top:25px;">
@@ -93,8 +90,8 @@
 <div id="reportModal" class="modal">
     <div class="modal-content">
         <h3 style="color:var(--primary); margin-top:0;">🚩 狀態回報</h3>
-        <select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">🚫 報廢</option><option value="異常">⚠️ 異常</option><option value="正常">✅ 正常</option><option value="移位">📦 移位</option></select>
-        <input type="text" id="reportReason" class="btn" placeholder="請輸入回報原因或說明...">
+        <select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">報廢</option><option value="異常">異常</option><option value="正常">正常</option><option value="移位">移位</option></select>
+        <input type="text" id="reportReason" class="btn" placeholder="原因...">
         <div style="display:flex; gap:12px; margin-top:25px;">
             <button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('reportModal')">取消</button>
             <button class="btn-main" style="flex:1;" onclick="submitReport()">提交</button>
@@ -103,7 +100,7 @@
 </div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2.5rem; margin-bottom: 10px;">倉儲庫位控管系統 <span style="color:var(--primary)">V18.0</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 10px;">倉儲庫位控管系統 <span style="color:var(--primary)">V18.2</span></h1>
     <button class="btn-main" style="padding: 20px 80px; border-radius:50px;" onclick="enterSystem()">啟動系統</button>
 </div>
 
@@ -138,7 +135,7 @@
     </section>
 
     <div class="search-wrapper">
-        <input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 快速搜尋..." oninput="handleSearchInput()">
+        <input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 快速搜尋..." oninput="handleSearchInput(false)">
         <span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span>
     </div>
 
@@ -153,13 +150,11 @@
 </div>
 
 <script>
-    // ⚠️ 請填入您的 GAS URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec"; 
     const _KEY = "YWRtaW4xMjM="; 
     let inventory = [], zoneConfigs = {}, isAdmin = false, currentId = null;
     let currentPage = 1, rowsPerPage = 10;
 
-    // 區域配色邏輯
     function getZoneColor(zone) {
         if (zone === "極冷庫-左") return "var(--color-polar-l)";
         if (zone === "極冷庫-右") return "var(--color-polar-r)";
@@ -183,7 +178,7 @@
         toggleLoader(false);
     }
 
-    function renderAll() { renderVisual(); renderTable(); }
+    function renderAll() { renderVisual(); renderTable(false); }
 
     function renderVisual() {
         const grid = document.getElementById('visualGrid');
@@ -198,34 +193,42 @@
         for (let i = 1; i <= config.maxPos; i++) {
             const items = inventory.filter(d => d.zone === zone && d.floor === floor && d.pos == i);
             const slot = document.createElement('div');
-            let statusClass = '';
-            let customBg = '';
+            let statusClass = '', customBg = '';
 
             if (items.length > 0) {
                 statusClass = 'occupied';
-                customBg = zoneColor; // 使用區域顏色
-                if (items.some(item => (item.note || "").includes("報廢"))) {
-                    statusClass = 'status-danger';
-                    customBg = ''; // 報廢優先顯示紅色
-                } else if (items.some(item => (item.note || "").includes("異常"))) {
-                    statusClass = 'status-warning';
-                    customBg = ''; // 異常優先顯示黃色
-                }
+                customBg = zoneColor;
+                
+                // --- 新增：關鍵字 (切) 偵測邏輯 ---
+                if (items.some(item => (item.name || "").includes("(切)"))) {
+                    statusClass = 'status-cut';
+                    customBg = ''; 
+                } 
+                // 優先級：報廢 > 異常 > (切) > 區域顏色
+                else if (items.some(item => (item.note || "").includes("報廢"))) statusClass = 'status-danger';
+                else if (items.some(item => (item.note || "").includes("異常"))) statusClass = 'status-warning';
             }
+            
             slot.className = `slot ${statusClass}`;
-            if(customBg) slot.style.background = customBg;
+            if(customBg && !statusClass.includes('status')) slot.style.background = customBg;
             slot.innerHTML = `<b>${i}</b>`;
-            slot.onclick = () => { document.getElementById('searchInput').value = `${zone}${floor}-${i}`; handleSearchInput(); };
+            slot.onclick = () => { document.getElementById('searchInput').value = `${zone}${floor}-${i}`; handleSearchInput(true); };
             grid.appendChild(slot);
         }
+        
         const zoneItems = inventory.filter(i => i.zone === zone);
         const occupiedCount = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
         document.getElementById('usageInfo').innerText = `使用率: ${((occupiedCount/(config.maxPos*4))*100).toFixed(1)}%`;
     }
 
-    function renderTable() {
+    function renderTable(isExact = false) {
         const kw = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = inventory.filter(i => `${i.zone}${i.floor}-${i.pos}${i.name}${i.batch}`.toLowerCase().includes(kw));
+        const filtered = inventory.filter(i => {
+            const fullPos = `${i.zone}${i.floor}-${i.pos}`.toLowerCase();
+            const otherInfo = `${i.name}${i.batch}${i.note}`.toLowerCase();
+            return isExact ? (fullPos === kw) : (fullPos + otherInfo).includes(kw);
+        });
+
         const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
         const start = (currentPage - 1) * rowsPerPage;
         const pagedData = filtered.slice(start, start + rowsPerPage);
@@ -248,10 +251,18 @@
                 </td>
             </tr>
         `).join('') || '<tr><td colspan="6" style="text-align:center; padding:30px;">無資料</td></tr>';
-        renderPagination(totalPages, filtered.length);
+        renderPagination(totalPages);
     }
 
-    function renderPagination(total, items) {
+    function handleSearchInput(isExact = false) { 
+        document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; 
+        currentPage = 1; 
+        renderTable(isExact); 
+    }
+
+    function clearSearch() { document.getElementById('searchInput').value = ''; handleSearchInput(false); }
+
+    function renderPagination(total) {
         const ctrl = document.getElementById('paginationCtrl');
         ctrl.innerHTML = `
             <button class="page-btn" onclick="changePage(1)" ${currentPage===1?'disabled':''}>首頁</button>
@@ -260,15 +271,13 @@
         `;
     }
 
-    function changePage(p) { currentPage = p; renderTable(); }
-    function handleSearchInput() { document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; currentPage=1; renderTable(); }
-    function clearSearch() { document.getElementById('searchInput').value = ''; handleSearchInput(); }
-    
+    function changePage(p) { currentPage = p; renderTable(false); }
+
     function toggleAdmin() {
         if(!isAdmin) {
             const p = prompt("管理金鑰:");
-            if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(); }
-        } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(); }
+            if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(false); }
+        } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(false); }
     }
 
     function openEdit(id) {
@@ -285,24 +294,17 @@
     }
 
     async function submitEdit() {
-        const p = {
-            action: 'edit',
-            id: document.getElementById('editId').value,
-            zone: document.getElementById('editZone').value,
-            floor: document.getElementById('editFloor').value,
-            pos: document.getElementById('editPos').value,
-            name: document.getElementById('editName').value,
-            batch: document.getElementById('editBatch').value,
-            date: document.getElementById('editDate').value,
-            note: document.getElementById('editNote').value
-        };
         toggleLoader(true);
-        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify(p) });
+        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({
+            action: 'edit', id: document.getElementById('editId').value,
+            zone: document.getElementById('editZone').value, floor: document.getElementById('editFloor').value, pos: document.getElementById('editPos').value,
+            name: document.getElementById('editName').value, batch: document.getElementById('editBatch').value, date: document.getElementById('editDate').value, note: document.getElementById('editNote').value
+        })});
         closeModal('editModal'); fetchData();
     }
 
     async function deleteItem(id) {
-        if(!confirm("確定要刪除這筆資料嗎？刪除後無法復原。")) return;
+        if(!confirm("確定要刪除這筆資料嗎？")) return;
         toggleLoader(true);
         await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'delete', id:id}) });
         fetchData();
