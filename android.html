@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V18.2 Pro</title>
+    <title>⚡ 倉儲庫位控管系統 V18.3 Pro</title>
     <style>
         /* --- 基礎樣式 (禁止變更) --- */
         :root { 
@@ -11,14 +11,10 @@
             --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
             --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
             --select-bg: #1e293b; --select-text: #c7d2fe;
-            /* 區域專屬配色 */
-            --color-polar-l: #38bdf8;
-            --color-polar-r: #818cf8;
-            --color-cool-l:  #fbbf24;
-            --color-cool-r:  #fb7185;
-            --color-normal:  #34d399;
-            /* 特殊狀態顏色 */
-            --color-cut:     #a855f7; /* (切) 產品專用色：紫色 */
+            /* 區域配色 */
+            --color-polar-l: #38bdf8; --color-polar-r: #818cf8;
+            --color-cool-l:  #fbbf24; --color-cool-r:  #fb7185;
+            --color-normal:  #34d399; --color-cut:     #a855f7; 
         }
         * { box-sizing: border-box; transition: all 0.2s; }
         body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; }
@@ -40,7 +36,7 @@
         .report-label { display: inline-block; margin-top: 6px; padding: 4px 10px; font-size: 11px; background: rgba(245, 158, 11, 0.15); color: var(--warning); border-radius: 6px; font-weight: bold; }
         .search-wrapper { position: relative; margin: 25px 0 15px 0; }
         .search-clear { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); font-size: 22px; display: none; }
-        .btn-main { padding: 10px 20px; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-main { padding: 10px 20px; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
         .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:11000; justify-content:center; align-items:center; backdrop-filter: blur(5px); }
         .modal-content { background:var(--select-bg); padding:30px; border-radius:28px; width:90%; max-width:480px; border:1px solid var(--primary); max-height: 90vh; overflow-y: auto; }
         .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 30px; padding-bottom: 40px; }
@@ -50,6 +46,8 @@
         @media screen and (max-width: 768px) {
             .container { padding: 15px; border-radius: 20px; }
             header { flex-direction: column; align-items: flex-start !important; gap: 15px; }
+            .header-actions { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
+            .header-actions .btn-main, .header-actions .usage-badge { width: 100%; justify-content: center; }
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
             tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 15px; overflow: hidden; }
@@ -63,51 +61,20 @@
 
 <div id="loader">⚙️ 資料處理中...</div>
 
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <h3 style="color:var(--edit); margin-top:0;">📝 編輯庫存與儲位</h3>
-        <input type="hidden" id="editId">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-            <div><label style="font-size:11px; color:var(--text-dim);">區域</label>
-                <select id="editZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
-            </div>
-            <div><label style="font-size:11px; color:var(--text-dim);">樓層</label>
-                <select id="editFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
-            </div>
-        </div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">儲位編號</label><input type="number" id="editPos" class="btn"></div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">產品名稱</label><input type="text" id="editName" class="btn"></div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">批號碼</label><input type="text" id="editBatch" class="btn"></div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">有效日期</label><input type="date" id="editDate" class="btn"></div>
-        <div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">備註說明</label><input type="text" id="editNote" class="btn"></div>
-        <div style="display:flex; gap:12px; margin-top:25px;">
-            <button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('editModal')">取消</button>
-            <button class="btn-main" style="background:var(--edit); flex:1;" onclick="submitEdit()">儲存更新</button>
-        </div>
-    </div>
-</div>
-
-<div id="reportModal" class="modal">
-    <div class="modal-content">
-        <h3 style="color:var(--primary); margin-top:0;">🚩 狀態回報</h3>
-        <select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">報廢</option><option value="異常">異常</option><option value="正常">正常</option><option value="移位">移位</option></select>
-        <input type="text" id="reportReason" class="btn" placeholder="原因...">
-        <div style="display:flex; gap:12px; margin-top:25px;">
-            <button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('reportModal')">取消</button>
-            <button class="btn-main" style="flex:1;" onclick="submitReport()">提交</button>
-        </div>
-    </div>
-</div>
+<div id="editModal" class="modal"><div class="modal-content"><h3 style="color:var(--edit); margin-top:0;">📝 編輯庫存與儲位</h3><input type="hidden" id="editId"><div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;"><div><label style="font-size:11px; color:var(--text-dim);">區域</label><select id="editZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select></div><div><label style="font-size:11px; color:var(--text-dim);">樓層</label><select id="editFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select></div></div><div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">儲位編號</label><input type="number" id="editPos" class="btn"></div><div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">產品名稱</label><input type="text" id="editName" class="btn"></div><div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">批號碼</label><input type="text" id="editBatch" class="btn"></div><div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">有效日期</label><input type="date" id="editDate" class="btn"></div><div style="margin-bottom:15px;"><label style="font-size:11px; color:var(--text-dim);">備註說明</label><input type="text" id="editNote" class="btn"></div><div style="display:flex; gap:12px; margin-top:25px;"><button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('editModal')">取消</button><button class="btn-main" style="background:var(--edit); flex:1;" onclick="submitEdit()">儲存更新</button></div></div></div>
+<div id="reportModal" class="modal"><div class="modal-content"><h3 style="color:var(--primary); margin-top:0;">🚩 狀態回報</h3><select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">報廢</option><option value="異常">異常</option><option value="正常">正常</option><option value="移位">移位</option></select><input type="text" id="reportReason" class="btn" placeholder="原因..."><div style="display:flex; gap:12px; margin-top:25px;"><button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('reportModal')">取消</button><button class="btn-main" style="flex:1;" onclick="submitReport()">提交</button></div></div></div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 10px;">倉儲庫位控管系統 <span style="color:var(--primary)">V18.2</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 10px;">倉儲庫位控管系統 <span style="color:var(--primary)">V18.3</span></h1>
     <button class="btn-main" style="padding: 20px 80px; border-radius:50px;" onclick="enterSystem()">啟動系統</button>
 </div>
 
 <div class="container" id="main-container">
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
         <h2 style="margin:0;">📦 庫位狀態</h2>
-        <div style="display:flex; gap:12px; align-items:center;">
+        <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
+            <a href="https://mingfonglpg-bit.github.io/-/count.html" target="_blank" class="btn-main" style="background:#1e293b; border: 1px solid var(--border);">🔍 查詢庫存量</a>
+            
             <div id="usageInfo" class="usage-badge">使用率: --%</div>
             <button onclick="fetchData()" class="btn-main" style="background:#334155;">🔄 刷新</button>
             <button id="adminBtn" onclick="toggleAdmin()" class="btn-main" style="background:rgba(167,139,250,0.1); color:#a78bfa;">🛠️ 管理員</button>
@@ -118,8 +85,7 @@
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
             <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
             <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
-            <input type="number" id="addPos" placeholder="儲位" class="btn"><input type="text" id="addName" placeholder="產品" class="btn"><input type="text" id="addBatch" placeholder="批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn">
-            <button onclick="commitAdd()" class="btn-main">➕ 入庫</button>
+            <input type="number" id="addPos" placeholder="儲位" class="btn"><input type="text" id="addName" placeholder="產品" class="btn"><input type="text" id="addBatch" placeholder="批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn"><button onclick="commitAdd()" class="btn-main">➕ 入庫</button>
         </div>
     </div>
 
@@ -134,18 +100,9 @@
         <div id="visualGrid" style="display:grid; gap:8px;"></div>
     </section>
 
-    <div class="search-wrapper">
-        <input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 快速搜尋..." oninput="handleSearchInput(false)">
-        <span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span>
-    </div>
+    <div class="search-wrapper"><input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 快速搜尋..." oninput="handleSearchInput(false)"><span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span></div>
 
-    <div style="overflow-x:auto;">
-        <table>
-            <thead><tr><th>儲位</th><th>產品</th><th>效期</th><th>批號</th><th>狀態</th><th>功能</th></tr></thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-    </div>
-
+    <div style="overflow-x:auto;"><table><thead><tr><th>儲位</th><th>產品</th><th>效期</th><th>批號</th><th>狀態</th><th>功能</th></tr></thead><tbody id="tableBody"></tbody></table></div>
     <div class="pagination" id="paginationCtrl"></div>
 </div>
 
@@ -198,24 +155,16 @@
             if (items.length > 0) {
                 statusClass = 'occupied';
                 customBg = zoneColor;
-                
-                // --- 新增：關鍵字 (切) 偵測邏輯 ---
-                if (items.some(item => (item.name || "").includes("(切)"))) {
-                    statusClass = 'status-cut';
-                    customBg = ''; 
-                } 
-                // 優先級：報廢 > 異常 > (切) > 區域顏色
+                if (items.some(item => (item.name || "").includes("(切)"))) statusClass = 'status-cut';
                 else if (items.some(item => (item.note || "").includes("報廢"))) statusClass = 'status-danger';
                 else if (items.some(item => (item.note || "").includes("異常"))) statusClass = 'status-warning';
             }
-            
             slot.className = `slot ${statusClass}`;
             if(customBg && !statusClass.includes('status')) slot.style.background = customBg;
             slot.innerHTML = `<b>${i}</b>`;
             slot.onclick = () => { document.getElementById('searchInput').value = `${zone}${floor}-${i}`; handleSearchInput(true); };
             grid.appendChild(slot);
         }
-        
         const zoneItems = inventory.filter(i => i.zone === zone);
         const occupiedCount = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
         document.getElementById('usageInfo').innerText = `使用率: ${((occupiedCount/(config.maxPos*4))*100).toFixed(1)}%`;
@@ -228,100 +177,38 @@
             const otherInfo = `${i.name}${i.batch}${i.note}`.toLowerCase();
             return isExact ? (fullPos === kw) : (fullPos + otherInfo).includes(kw);
         });
-
         const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
         const start = (currentPage - 1) * rowsPerPage;
         const pagedData = filtered.slice(start, start + rowsPerPage);
-
         document.getElementById('tableBody').innerHTML = pagedData.map(i => `
             <tr>
                 <td data-label="儲位位置"><b style="color:${getZoneColor(i.zone)}">${i.floor}-${i.pos}</b><small>${i.zone}</small></td>
                 <td data-label="產品內容"><b>${i.name}</b>${i.note ? `<span class="report-label">⚠️ ${i.note}</span>` : ''}</td>
-                <td data-label="有效日期">${i.date ? i.date.split('T')[0] : '-'}</td>
-                <td data-label="批號碼"><code>${i.batch}</code></td>
-                <td data-label="備註狀態"><small>${i.note ? '有紀錄' : '正常'}</small></td>
-                <td data-label="功能操作">
-                    <div class="action-btns" style="display:flex; gap:5px;">
-                        <button class="btn-main" style="background:#475569; padding:6px 10px;" onclick="openReport('${i.id}')">回報</button>
-                        ${isAdmin ? `
-                            <button class="btn-main" style="background:var(--edit); padding:6px 10px;" onclick="openEdit('${i.id}')">編輯</button>
-                            <button class="btn-main" style="background:var(--danger); padding:6px 10px;" onclick="deleteItem('${i.id}')">刪除</button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>
-        `).join('') || '<tr><td colspan="6" style="text-align:center; padding:30px;">無資料</td></tr>';
+                <td data-label="有效日期">${i.date ? i.date.split('T')[0] : '-'}</td><td data-label="批號碼"><code>${i.batch}</code></td><td data-label="備註狀態"><small>${i.note ? '有紀錄' : '正常'}</small></td>
+                <td data-label="功能操作"><div class="action-btns" style="display:flex; gap:5px;"><button class="btn-main" style="background:#475569; padding:6px 10px;" onclick="openReport('${i.id}')">回報</button>${isAdmin ? `<button class="btn-main" style="background:var(--edit); padding:6px 10px;" onclick="openEdit('${i.id}')">編輯</button><button class="btn-main" style="background:var(--danger); padding:6px 10px;" onclick="deleteItem('${i.id}')">刪除</button>` : ''}</div></td>
+            </tr>`).join('') || '<tr><td colspan="6" style="text-align:center; padding:30px;">無資料</td></tr>';
         renderPagination(totalPages);
     }
 
-    function handleSearchInput(isExact = false) { 
-        document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; 
-        currentPage = 1; 
-        renderTable(isExact); 
-    }
-
+    function handleSearchInput(isExact = false) { document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; currentPage = 1; renderTable(isExact); }
     function clearSearch() { document.getElementById('searchInput').value = ''; handleSearchInput(false); }
-
     function renderPagination(total) {
         const ctrl = document.getElementById('paginationCtrl');
-        ctrl.innerHTML = `
-            <button class="page-btn" onclick="changePage(1)" ${currentPage===1?'disabled':''}>首頁</button>
-            <span style="font-size:13px; color:var(--text-dim)">${currentPage} / ${total}</span>
-            <button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===total?'disabled':''}>下一頁</button>
-        `;
+        ctrl.innerHTML = `<button class="page-btn" onclick="changePage(1)" ${currentPage===1?'disabled':''}>首頁</button><span style="font-size:13px; color:var(--text-dim)">${currentPage} / ${total}</span><button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===total?'disabled':''}>下一頁</button>`;
     }
-
     function changePage(p) { currentPage = p; renderTable(false); }
-
     function toggleAdmin() {
-        if(!isAdmin) {
-            const p = prompt("管理金鑰:");
-            if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(false); }
-        } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(false); }
+        if(!isAdmin) { const p = prompt("管理金鑰:"); if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(false); } }
+        else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(false); }
     }
-
     function openEdit(id) {
         const item = inventory.find(i => i.id.toString() === id.toString());
-        document.getElementById('editId').value = id;
-        document.getElementById('editZone').value = item.zone;
-        document.getElementById('editFloor').value = item.floor;
-        document.getElementById('editPos').value = item.pos;
-        document.getElementById('editName').value = item.name;
-        document.getElementById('editBatch').value = item.batch;
-        document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : '';
-        document.getElementById('editNote').value = item.note || '';
-        document.getElementById('editModal').style.display = 'flex';
+        document.getElementById('editId').value = id; document.getElementById('editZone').value = item.zone; document.getElementById('editFloor').value = item.floor; document.getElementById('editPos').value = item.pos; document.getElementById('editName').value = item.name; document.getElementById('editBatch').value = item.batch; document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : ''; document.getElementById('editNote').value = item.note || ''; document.getElementById('editModal').style.display = 'flex';
     }
-
-    async function submitEdit() {
-        toggleLoader(true);
-        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({
-            action: 'edit', id: document.getElementById('editId').value,
-            zone: document.getElementById('editZone').value, floor: document.getElementById('editFloor').value, pos: document.getElementById('editPos').value,
-            name: document.getElementById('editName').value, batch: document.getElementById('editBatch').value, date: document.getElementById('editDate').value, note: document.getElementById('editNote').value
-        })});
-        closeModal('editModal'); fetchData();
-    }
-
-    async function deleteItem(id) {
-        if(!confirm("確定要刪除這筆資料嗎？")) return;
-        toggleLoader(true);
-        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'delete', id:id}) });
-        fetchData();
-    }
-
-    async function submitReport() {
-        toggleLoader(true);
-        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'report', id:currentId, type:document.getElementById('reportType').value, reason:document.getElementById('reportReason').value}) });
-        closeModal('reportModal'); fetchData();
-    }
-
-    async function commitAdd() {
-        toggleLoader(true);
-        await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:"add", zone:document.getElementById('addZone').value, floor:document.getElementById('addFloor').value, pos:document.getElementById('addPos').value, name:document.getElementById('addName').value, batch:document.getElementById('addBatch').value, date:document.getElementById('addDate').value, note:document.getElementById('addNote').value}) });
-        fetchData();
-    }
-
+    async function submitEdit() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({ action: 'edit', id: document.getElementById('editId').value, zone: document.getElementById('editZone').value, floor: document.getElementById('editFloor').value, pos: document.getElementById('editPos').value, name: document.getElementById('editName').value, batch: document.getElementById('editBatch').value, date: document.getElementById('editDate').value, note: document.getElementById('editNote').value })}); closeModal('editModal'); fetchData(); }
+    async function deleteItem(id) { if(!confirm("確定要刪除這筆資料嗎？")) return; toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'delete', id:id}) }); fetchData(); }
+    async function submitReport() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'report', id:currentId, type:document.getElementById('reportType').value, reason:document.getElementById('reportReason').value}) }); closeModal('reportModal'); fetchData(); }
+    async function commitAdd() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:"add", zone:document.getElementById('addZone').value, floor:document.getElementById('addFloor').value, pos:document.getElementById('addPos').value, name:document.getElementById('addName').value, batch:document.getElementById('addBatch').value, date:document.getElementById('addDate').value, note:document.getElementById('addNote').value}) }); fetchData(); }
     function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
     function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
