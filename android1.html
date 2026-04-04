@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚡ 倉儲庫位控管系統 V18.3 Pro</title>
     <style>
-        /* --- 基礎樣式 (禁止變更) --- */
+        /* --- 基礎樣式 --- */
         :root { 
             --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
             --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
@@ -20,7 +20,7 @@
         body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; }
         .container { width: 95%; max-width: 1400px; margin: 20px auto; background: var(--card-bg); backdrop-filter: blur(20px); padding: 25px; border-radius: 28px; border: 1px solid var(--border); display: none; }
         
-        /* 跑馬燈專屬樣式 */
+        /* 📣 跑馬燈樣式 */
         .marquee-wrapper {
             background: rgba(99, 102, 241, 0.1);
             border: 1px solid var(--border);
@@ -39,16 +39,34 @@
             font-weight: 500;
             font-size: 14px;
         }
-        .marquee-wrapper:hover .marquee-content {
-            animation-play-state: paused;
-        }
-        @keyframes marquee-scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-100%); }
-        }
+        .marquee-wrapper:hover .marquee-content { animation-play-state: paused; }
+        @keyframes marquee-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
+        /* 🚀 重新設計的控制列樣式 */
+        .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        
+        .usage-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(129, 140, 248, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 8px 16px; border-radius: 16px;
+            display: flex; flex-direction: column; align-items: flex-start; min-width: 110px;
+        }
+        .usage-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        #usageInfo { font-size: 18px; font-weight: 800; color: var(--primary); margin: 0; }
+
+        .btn-group { display: flex; gap: 8px; background: rgba(255, 255, 255, 0.05); padding: 6px; border-radius: 18px; border: 1px solid var(--border); }
+        .btn-modern {
+            padding: 10px 18px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600;
+            cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s;
+        }
+        .btn-query { background: #334155; color: #f8fafc; text-decoration: none; }
+        .btn-refresh { background: var(--primary); color: white; }
+        .btn-admin { background: rgba(167, 139, 250, 0.1); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.3); }
+        .btn-admin.active { background: #a78bfa; color: white; }
+        .btn-modern:hover { transform: translateY(-2px); filter: brightness(1.1); }
+
+        /* 表格與儲位樣式 */
         select.btn, input.btn { background: var(--select-bg) !important; color: var(--select-text) !important; border: 1px solid var(--border); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-size: 14px; }
-        .usage-badge { background: rgba(99, 102, 241, 0.15); color: var(--primary); padding: 8px 16px; border-radius: 12px; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.2); }
         .slot { aspect-ratio: 1; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
         .slot.occupied { background: var(--primary); color: white; }
         .slot.status-warning { background: var(--warning) !important; }
@@ -74,14 +92,14 @@
         @media screen and (max-width: 768px) {
             .container { padding: 15px; border-radius: 20px; }
             header { flex-direction: column; align-items: flex-start !important; gap: 15px; }
-            .header-actions { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
-            .header-actions .btn-main, .header-actions .usage-badge { width: 100%; justify-content: center; }
+            .header-actions { width: 100%; flex-direction: column; align-items: stretch; }
+            .btn-group { display: grid; grid-template-columns: 1fr 1fr; }
+            .btn-admin { grid-column: span 2; }
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
             tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 15px; overflow: hidden; }
             td { padding: 12px 15px; text-align: right; border: none !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; position: relative; display: flex; justify-content: space-between; align-items: center; }
             td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; }
-            .action-btns { justify-content: flex-end; width: 100%; }
         }
     </style>
 </head>
@@ -100,18 +118,33 @@
 <div class="container" id="main-container">
     <div class="marquee-wrapper">
         <div class="marquee-content">
-            📢 系統公告：最近更新日期2026.04.02。 ⚠️ 注意：出貨前請優先出舊批號與效期。 🔄 資料如有誤,請利用回報功能。
+            📢 系統公告：最後更新日2026.04.02。 ⚠️ 注意：出貨請優先出舊批號與效期近的。  🔄 資料有誤請點回報。
         </div>
     </div>
 
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-        <h2 style="margin:0;">📦 庫位狀態</h2>
-        <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
-            <a href="https://mingfonglpg-bit.github.io/-/count.html" target="_blank" class="btn-main" style="background:#1e293b; border: 1px solid var(--border);">🔍 查詢庫存量</a>
-            
-            <div id="usageInfo" class="usage-badge">使用率: --%</div>
-            <button onclick="fetchData()" class="btn-main" style="background:#334155;">🔄 刷新</button>
-            <button id="adminBtn" onclick="toggleAdmin()" class="btn-main" style="background:rgba(167,139,250,0.1); color:#a78bfa;">🛠️ 管理員</button>
+        <h2 style="margin:0; font-weight: 800; letter-spacing: -0.5px;">📦 庫位狀態</h2>
+        
+        <div class="header-actions">
+            <div class="usage-card">
+                <span class="usage-label">庫位使用率</span>
+                <div id="usageInfo">--%</div>
+            </div>
+
+            <div class="btn-group">
+                <a href="https://mingfonglpg-bit.github.io/-/count.html" target="_blank" class="btn-modern btn-query">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    查詢庫存
+                </a>
+                <button onclick="fetchData()" class="btn-modern btn-refresh">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    刷新
+                </button>
+                <button id="adminBtn" onclick="toggleAdmin()" class="btn-modern btn-admin">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    管理員
+                </button>
+            </div>
         </div>
     </header>
 
@@ -134,7 +167,10 @@
         <div id="visualGrid" style="display:grid; gap:8px;"></div>
     </section>
 
-    <div class="search-wrapper"><input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 快速搜尋..." oninput="handleSearchInput(false)"><span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span></div>
+    <div class="search-wrapper">
+        <input type="text" id="searchInput" class="btn" style="height: 55px;" placeholder="🔍 輸入產品名稱、批號或儲位編號搜尋..." oninput="handleSearchInput(false)">
+        <span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span>
+    </div>
 
     <div style="overflow-x:auto;"><table><thead><tr><th>儲位</th><th>產品</th><th>效期</th><th>批號</th><th>狀態</th><th>功能</th></tr></thead><tbody id="tableBody"></tbody></table></div>
     <div class="pagination" id="paginationCtrl"></div>
@@ -201,7 +237,7 @@
         }
         const zoneItems = inventory.filter(i => i.zone === zone);
         const occupiedCount = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
-        document.getElementById('usageInfo').innerText = `使用率: ${((occupiedCount/(config.maxPos*4))*100).toFixed(1)}%`;
+        document.getElementById('usageInfo').innerText = `${((occupiedCount/(config.maxPos*4))*100).toFixed(1)}%`;
     }
 
     function renderTable(isExact = false) {
@@ -231,18 +267,36 @@
         ctrl.innerHTML = `<button class="page-btn" onclick="changePage(1)" ${currentPage===1?'disabled':''}>首頁</button><span style="font-size:13px; color:var(--text-dim)">${currentPage} / ${total}</span><button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===total?'disabled':''}>下一頁</button>`;
     }
     function changePage(p) { currentPage = p; renderTable(false); }
+    
     function toggleAdmin() {
-        if(!isAdmin) { const p = prompt("管理金鑰:"); if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('adminBtn').innerText="🔐 管理中"; renderTable(false); } }
-        else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; renderTable(false); }
+        const btn = document.getElementById('adminBtn');
+        if(!isAdmin) {
+            const p = prompt("管理金鑰:");
+            if(p && btoa(p) === _KEY) {
+                isAdmin=true;
+                document.getElementById('admin-panel').style.display='block';
+                btn.classList.add('active');
+                btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg> 管理中`;
+                renderTable(false);
+            }
+        } else {
+            isAdmin=false;
+            document.getElementById('admin-panel').style.display='none';
+            btn.classList.remove('active');
+            btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> 管理員`;
+            renderTable(false);
+        }
     }
-    function openEdit(id) {
-        const item = inventory.find(i => i.id.toString() === id.toString());
-        document.getElementById('editId').value = id; document.getElementById('editZone').value = item.zone; document.getElementById('editFloor').value = item.floor; document.getElementById('editPos').value = item.pos; document.getElementById('editName').value = item.name; document.getElementById('editBatch').value = item.batch; document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : ''; document.getElementById('editNote').value = item.note || ''; document.getElementById('editModal').style.display = 'flex';
-    }
+
     async function submitEdit() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({ action: 'edit', id: document.getElementById('editId').value, zone: document.getElementById('editZone').value, floor: document.getElementById('editFloor').value, pos: document.getElementById('editPos').value, name: document.getElementById('editName').value, batch: document.getElementById('editBatch').value, date: document.getElementById('editDate').value, note: document.getElementById('editNote').value })}); closeModal('editModal'); fetchData(); }
     async function deleteItem(id) { if(!confirm("確定要刪除這筆資料嗎？")) return; toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'delete', id:id}) }); fetchData(); }
     async function submitReport() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:'report', id:currentId, type:document.getElementById('reportType').value, reason:document.getElementById('reportReason').value}) }); closeModal('reportModal'); fetchData(); }
     async function commitAdd() { toggleLoader(true); await fetch(SCRIPT_URL, { method:'POST', body:JSON.stringify({action:"add", zone:document.getElementById('addZone').value, floor:document.getElementById('addFloor').value, pos:document.getElementById('addPos').value, name:document.getElementById('addName').value, batch:document.getElementById('addBatch').value, date:document.getElementById('addDate').value, note:document.getElementById('addNote').value}) }); fetchData(); }
+    
+    function openEdit(id) {
+        const item = inventory.find(i => i.id.toString() === id.toString());
+        document.getElementById('editId').value = id; document.getElementById('editZone').value = item.zone; document.getElementById('editFloor').value = item.floor; document.getElementById('editPos').value = item.pos; document.getElementById('editName').value = item.name; document.getElementById('editBatch').value = item.batch; document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : ''; document.getElementById('editNote').value = item.note || ''; document.getElementById('editModal').style.display = 'flex';
+    }
     function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
     function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
