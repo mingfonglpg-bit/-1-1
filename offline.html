@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倉儲庫位控管系統 V18.3</title>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --bg: #f4f7f6; --dark: #343a40; --purple: #6f42c1; }
+        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; margin: 0; background-color: var(--bg); color: #333; }
+        header { background: var(--dark); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; }
+        .container { padding: 15px; max-width: 1100px; margin: auto; }
+        .status-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-top: 4px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .toolbar { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        
+        .btn { border: none; padding: 12px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; flex: 1; min-width: 110px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-sync { background: var(--primary); }
+        .btn-import { background: var(--success); }
+        .btn-stats { background: var(--purple); }
+        .btn-clear { background: #6c757d; }
+        .search-box { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; margin-bottom: 15px; box-sizing: border-box; }
+        
+        .table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; min-width: 750px; }
+        th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; cursor: pointer; user-select: none; }
+        th:hover { background: #e9ecef; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .expiry { color: #d9534f; font-weight: bold; }
+        .sort-icon { font-size: 0.8em; margin-left: 5px; color: #bbb; }
+
+        /* 分頁控制項樣式 */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; padding: 10px; background: white; border-radius: 8px; }
+        .page-btn { padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .page-btn:hover:not(:disabled) { background: #f0f0f0; border-color: var(--primary); }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #pageInfo { font-weight: bold; color: var(--dark); }
+
+        #statsPanel { position: fixed; top: 0; right: -350px; width: 320px; height: 100%; background: white; box-shadow: -2px 0 10px rgba(0,0,0,0.2); z-index: 2000; transition: 0.3s; padding: 20px; }
+        #statsPanel.open { right: 0; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1999; }
+        #fileInput { display: none; }
+    </style>
+</head>
+<body>
+
+<header>⚡ 倉儲庫位控管系統 V18.3 (離線版)</header>
+
+<div class="container">
+    <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜尋產品名稱、區域、位置..." oninput="onSearchInput()">
+
+    <div class="status-card">
+        <div id="syncTime" style="font-size: 13px; color: #666;">最後更新：尚未載入</div>
+        <div id="dataCount" style="font-size: 13px; color: #666;">總計資料：0 筆</div>
+    </div>
+
+    <div class="toolbar">
+        <button id="syncBtn" class="btn btn-sync" onclick="syncData()">☁️ 雲端同步</button>
+        <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">📁 手動匯入</button>
+        <button class="btn btn-stats" onclick="verifyAdmin()">📊 數據統計</button>
+        <button class="btn btn-clear" onclick="clearData()">🗑️ 清空快取</button>
+        <input type="file" id="fileInput" accept=".csv, .xlsx" onchange="handleManualImport(event)">
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">區域</th>
+                    <th style="width: 15%;">儲位</th>
+                    <th onclick="toggleSort('name')">產品名稱 <span id="sort-name" class="sort-icon">⇅</span></th>
+                    <th onclick="toggleSort('batch')">批號 <span id="sort-batch" class="sort-icon">⇅</span></th>
+                    <th onclick="toggleSort('date')">效期 <span id="sort-date" class="sort-icon">⇅</span></th>
+                    <th style="width: 15%;">備註</th>
+                </tr>
+            </thead>
+            <tbody id="dataTable"></tbody>
+        </table>
+    </div>
+
+    <div class="pagination">
+        <button class="page-btn" id="prevBtn" onclick="changePage(-1)">◀ 上一頁</button>
+        <span id="pageInfo">第 1 / 1 頁</span>
+        <button class="page-btn" id="nextBtn" onclick="changePage(1)">下一頁 ▶</button>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeStats()"></div>
+<div id="statsPanel">
+    <h3>🔍 搜尋頻次統計</h3>
+    <div id="statsContent" style="max-height: 80%; overflow-y: auto;"></div>
+    <button class="btn btn-clear" style="width:100%; margin-top:20px;" onclick="closeStats()">關閉</button>
+</div>
+
+<script>
+    
+    const _pwd = 'ODg4OA=='; 
+    const CSV_URL = 'https://mingfonglpg-bit.github.io/-1-1/擴充凍庫.xlsx';
+
+    const db = new Dexie("InventoryDB");
+    db.version(2).stores({ 
+        stocks: '++id, zone, name, batch, location',
+        searchLogs: '++id, keyword, count' 
+    });
+
+    // 分頁與排序狀態
+    let allFilteredData = [];
+    let currentPage = 1;
+    const itemsPerPage = 15; 
+    let currentSortField = '';
+    let currentSortOrder = 'asc';
+    let searchTimer;
+
+    function formatSafeValue(val) {
+        if (!val) return "";
+        if (!isNaN(val) && Number(val) > 30000) {
+            const date = new Date(Math.round((Number(val) - 25569) * 86400 * 1000));
+            return date.toISOString().split('T')[0];
+        }
+        return String(val).trim();
+    }
+
+    async function processWorkbook(arrayBuffer) {
+        const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        await db.stocks.clear();
+        const formatted = json.map(row => ({
+            zone: formatSafeValue(row.Zone || row.區域),
+            location: `${formatSafeValue(row.Floor || row.樓層 || "")}-${formatSafeValue(row.Pos || row.位置 || "")}`,
+            name: formatSafeValue(row.Name || row.品名),
+            batch: formatSafeValue(row.Batch || row.批號),
+            date: formatSafeValue(row.Date || row.效期),
+            note: formatSafeValue(row.Note || row.備註)
+        }));
+        await db.stocks.bulkAdd(formatted);
+        localStorage.setItem('lastUpdate', new Date().toLocaleString());
+        handleSearch();
+    }
+
+    async function syncData() {
+        const btn = document.getElementById('syncBtn');
+        btn.disabled = true; btn.innerText = "🔄 同步中...";
+        try {
+            const res = await fetch(CSV_URL);
+            await processWorkbook(await res.arrayBuffer());
+        } catch (e) { alert("同步失敗！"); }
+        finally { btn.disabled = false; btn.innerText = "☁️ 雲端同步"; }
+    }
+
+    function handleManualImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => processWorkbook(e.target.result);
+        reader.readAsArrayBuffer(file);
+    }
+
+    function onSearchInput() {
+        currentPage = 1; // 搜尋時回到第一頁
+        handleSearch();
+        const kw = document.getElementById('searchInput').value.trim();
+        clearTimeout(searchTimer);
+        if (kw.length >= 2) searchTimer = setTimeout(() => logSearch(kw), 1000);
+    }
+
+    async function logSearch(kw) {
+        const log = await db.searchLogs.where('keyword').equals(kw).first();
+        if (log) await db.searchLogs.update(log.id, { count: log.count + 1 });
+        else await db.searchLogs.add({ keyword: kw, count: 1 });
+    }
+
+    async function handleSearch() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const data = await db.stocks.toArray();
+        allFilteredData = data.filter(i => 
+            i.name.toLowerCase().includes(query) || i.zone.toLowerCase().includes(query) || i.batch.toLowerCase().includes(query) || i.location.toLowerCase().includes(query)
+        );
+        if (currentSortField) applySort();
+        renderTable();
+    }
+
+    function toggleSort(field) {
+        if (currentSortField === field) currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+        else { currentSortField = field; currentSortOrder = 'asc'; }
+        
+        document.querySelectorAll('.sort-icon').forEach(el => el.innerText = '⇅');
+        document.getElementById(`sort-${field}`).innerText = currentSortOrder === 'asc' ? '▲' : '▼';
+        
+        applySort();
+        renderTable();
+    }
+
+    function applySort() {
+        allFilteredData.sort((a, b) => {
+            let A = a[currentSortField] || '', B = b[currentSortField] || '';
+            if (currentSortField === 'batch') return currentSortOrder === 'asc' ? A.localeCompare(B, undefined, {numeric:true}) : B.localeCompare(A, undefined, {numeric:true});
+            return currentSortOrder === 'asc' ? A.localeCompare(B, 'zh-TW') : B.localeCompare(A, 'zh-TW');
+        });
+    }
+
+    // --- 核心分頁渲染邏輯 ---
+    function renderTable() {
+        const totalPages = Math.ceil(allFilteredData.length / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = allFilteredData.slice(start, end);
+
+        document.getElementById('dataTable').innerHTML = pageData.map(item => `
+            <tr>
+                <td><strong>${item.zone}</strong></td>
+                <td>${item.location}</td>
+                <td>${item.name}</td>
+                <td>${item.batch}</td>
+                <td class="expiry">${item.date}</td>
+                <td><small>${item.note}</small></td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" style="text-align:center; padding:20px;">無相符資料</td></tr>';
+
+        // 更新分頁文字與按鈕狀態
+        document.getElementById('pageInfo').innerText = `第 ${currentPage} / ${totalPages} 頁`;
+        document.getElementById('prevBtn').disabled = (currentPage === 1);
+        document.getElementById('nextBtn').disabled = (currentPage === totalPages);
+        
+        document.getElementById('dataCount').innerText = `總計資料：${allFilteredData.length} 筆`;
+        document.getElementById('syncTime').innerText = `最後更新：${localStorage.getItem('lastUpdate') || '無'}`;
+    }
+
+    function changePage(step) {
+        currentPage += step;
+        renderTable();
+        window.scrollTo(0, 0); // 換頁後自動回到最上方
+    }
+
+    function verifyAdmin() {
+        const input = prompt("請輸入管理員密碼：");
+        if (input === atob(_pwd)) {
+            document.getElementById('statsPanel').classList.add('open');
+            document.getElementById('overlay').style.display = 'block';
+            showStats();
+        } else if (input !== null) alert("密碼錯誤！");
+    }
+
+    async function showStats() {
+        const logs = await db.searchLogs.orderBy('count').reverse().toArray();
+        document.getElementById('statsContent').innerHTML = logs.map(l => 
+            `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee;">
+                <span>${l.keyword}</span><b>${l.count} 次</b>
+            </div>`
+        ).join('') || "尚無數據";
+    }
+
+    function closeStats() {
+        document.getElementById('statsPanel').classList.remove('open');
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    async function clearData() {
+        if(confirm("確定清空本地所有快取資料？")) {
+            await db.stocks.clear();
+            handleSearch();
+        }
+    }
+
+    (async () => { allFilteredData = await db.stocks.toArray(); renderTable(); })();
+</script>
+</body>
+</html>
