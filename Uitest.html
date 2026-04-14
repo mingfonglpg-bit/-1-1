@@ -26,7 +26,7 @@
         .marquee-text { display: inline-block; animation: marquee 20s linear infinite; color: var(--primary); font-weight: 500; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
-        /* --- 垂直跑馬燈公告 (兩列高度) --- */
+        /* --- 垂直跑馬燈公告 (固定兩列高度) --- */
         .notice-bar {
             background: rgba(245, 158, 11, 0.1); border-left: 4px solid var(--warning);
             padding: 12px 20px; margin-bottom: 20px; border-radius: 4px 12px 12px 4px;
@@ -62,7 +62,7 @@
         td:last-child { border-right: 1px solid var(--border); border-radius: 0 15px 15px 0; }
         td b { display: block; font-size: 16px; color: var(--text-main); margin-bottom: 4px; }
         
-        .btn-main { padding: 10px 20px; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+        .btn-main { padding: 10px 20px; border-radius: 12px; border: none; background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; white-space: nowrap; }
         select.btn, input.btn { background: var(--select-bg) !important; color: var(--select-text) !important; border: 1px solid var(--border); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-size: 14px; }
         .usage-badge { background: rgba(99, 102, 241, 0.15); color: var(--primary); padding: 8px 16px; border-radius: 12px; font-weight: bold; border: 1px solid rgba(99, 102, 241, 0.2); }
         .report-label { display: inline-block; margin-top: 6px; padding: 4px 10px; font-size: 11px; background: rgba(245, 158, 11, 0.15); color: var(--warning); border-radius: 6px; font-weight: bold; }
@@ -80,26 +80,43 @@
             .header-actions { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
             .usage-badge { grid-column: span 2; text-align: center; font-size: 12px; }
 
-            /* 儲位圖優化：支援橫向滾動，防止格子太小 */
-            #visualGrid { 
-                display: flex !important; 
-                overflow-x: auto; 
-                gap: 8px; 
-                padding-bottom: 12px; 
-                -webkit-overflow-scrolling: touch; 
-            }
+            /* 儲位圖優化：支援橫向滾動 */
+            #visualGrid { display: flex !important; overflow-x: auto; gap: 8px; padding-bottom: 12px; -webkit-overflow-scrolling: touch; }
             .slot { flex: 0 0 60px; height: 60px; font-size: 13px; }
 
-            /* 表格轉換為卡片 */
+            /* 表格轉換為卡片式佈局 */
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
             tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 15px; overflow: hidden; background: rgba(255,255,255,0.02); }
             td { padding: 12px 15px; text-align: right; border: none !important; position: relative; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
             td:last-child { border-bottom: none !important; }
-            td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: bold; }
             
-            .action-btns { width: 100%; justify-content: flex-end; }
-            .btn-main { padding: 12px 15px; font-size: 14px; }
+            /* 修正手機版標籤與按鈕擠壓問題 */
+            td::before { 
+                content: attr(data-label); 
+                color: var(--text-dim); 
+                font-size: 12px; 
+                font-weight: bold; 
+                text-align: left;
+                min-width: 65px; /* 給標籤固定最小寬度 */
+                margin-right: 10px;
+            }
+            
+            /* 修正功能操作按鈕文字不換行 */
+            .action-btns { 
+                width: auto; 
+                display: flex; 
+                gap: 6px; 
+                flex-wrap: nowrap; /* 強制不換行 */
+            }
+            .action-btns .btn-main { 
+                padding: 8px 10px; 
+                font-size: 13px; 
+                flex-shrink: 0; /* 防止按鈕被擠壓 */
+                white-space: nowrap; /* 強制文字在一行內 */
+            }
+
+            .btn-main { font-size: 14px; }
             .modal-content { width: 95%; padding: 20px; }
         }
     </style>
@@ -209,8 +226,6 @@
         const floor = document.getElementById('vFloor').value;
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
-        
-        // 針對電腦版維持 Grid，手機版 CSS 已會處理成 flex
         grid.style.gridTemplateColumns = `repeat(${config.cols}, 1fr)`;
         grid.innerHTML = '';
         const zoneColor = getZoneColor(zone);
@@ -256,9 +271,9 @@
                 <td data-label="批號碼"><code>${i.batch}</code></td>
                 <td data-label="備註狀態"><small>${i.note ? '有紀錄' : '正常'}</small></td>
                 <td data-label="功能操作">
-                    <div class="action-btns" style="display:flex; gap:5px;">
-                        <button class="btn-main" style="background:#475569; padding:6px 10px;" onclick="openReport('${i.id}')">回報</button>
-                        ${isAdmin ? `<button class="btn-main" style="background:var(--edit); padding:6px 10px;" onclick="openEdit('${i.id}')">編輯</button><button class="btn-main" style="background:var(--danger); padding:6px 10px;" onclick="deleteItem('${i.id}')">刪除</button>` : ''}
+                    <div class="action-btns">
+                        <button class="btn-main" style="background:#475569;" onclick="openReport('${i.id}')">回報</button>
+                        ${isAdmin ? `<button class="btn-main" style="background:var(--edit);" onclick="openEdit('${i.id}')">編輯</button><button class="btn-main" style="background:var(--danger);" onclick="deleteItem('${i.id}')">刪除</button>` : ''}
                     </div>
                 </td>
             </tr>`).join('') || '<tr><td colspan="6" style="text-align:center; padding:30px;">無資料</td></tr>';
