@@ -34,16 +34,17 @@
         .tag-inbound { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid #818cf8; }
         .tag-outbound { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #34d399; }
         .tag-alert { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #f87171; }
+        .tag-other { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid #94a3b8; }
 
         .task-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; display: block; }
         .task-info { font-size: 12px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px; }
         
-        #loader { position: fixed; top: 20px; right: 20px; background: var(--primary); color: white; padding: 5px 15px; border-radius: 20px; display: none; }
+        #loader { position: fixed; top: 20px; right: 20px; background: var(--primary); color: white; padding: 5px 15px; border-radius: 20px; display: none; z-index: 100; }
     </style>
 </head>
 <body>
 
-    <div id="loader">同步中...</div>
+    <div id="loader">⚙️ 同步中...</div>
 
     <div class="header">
         <div><h1>TASK COMMAND CENTER</h1><small>極冷庫任務排程系統 V1.0</small></div>
@@ -63,17 +64,23 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec";
+        // 這裡使用的是您提供的 GAS 部署網址 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYRXqwgk8AlfpV2spw3mSDnTz-xZN0aMGplU3EU4z8LinGUIEVx4iAY9u5PbWR32Xb/exec";
 
         async function fetchScheduleData() {
             document.getElementById('loader').style.display = 'block';
             try {
+                // 修正：target=schedule 確保呼叫 handleScheduleRequest() 
                 const res = await fetch(`${SCRIPT_URL}?target=schedule`);
                 const result = await res.json();
-                if (result.status === "success") {
-                    updateUI(result.tasks);
+                
+                // 修正：檢查後端回傳的關鍵字為 'schedule' 而非 'tasks' 
+                if (result.schedule && Array.isArray(result.schedule)) {
+                    updateUI(result.schedule);
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error("抓取資料失敗:", e); 
+            }
             document.getElementById('loader').style.display = 'none';
         }
 
@@ -82,32 +89,48 @@
             const counts = { '待處理': 0, '執行中': 0, '已完成': 0 };
             let stats = { inbound: 0, alert: 0 };
 
+            // 清空舊卡片
             Object.values(cols).forEach(id => document.getElementById(id).innerHTML = '');
 
             tasks.forEach(t => {
+                // 對應 GAS 中定義的中文字段：時間, 類型, 內容, 狀態, 備註 
                 const status = t['狀態'] || '待處理';
-                const type = t['類型'] || '';
+                const type = t['類型'] || '一般任務';
+                const content = t['內容'] || '無標題';
+                const time = t['時間'] || '';
+                const note = t['備註'] || '無';
+
+                // 更新統計數據
                 if (type === '進貨預約') stats.inbound++;
                 if (type === '效期警示') stats.alert++;
                 if (counts.hasOwnProperty(status)) counts[status]++;
 
                 const colId = cols[status] || 'col-pending';
                 const tagClass = getTagClass(type);
+                
+                // 格式化日期顯示
+                const dateStr = time ? new Date(time).toLocaleDateString() : '未定';
+
                 const card = `
                     <div class="task-card">
                         <span class="task-tag ${tagClass}">${type}</span>
-                        <span class="task-title">${t['內容'] || '無標題'}</span>
+                        <span class="task-title">${content}</span>
                         <div class="task-info">
-                            <span>⏰ 時間: ${t['時間'] ? t['時間'].split('T')[0] : '未定'}</span>
-                            <span>📝 備註: ${t['備註'] || '無'}</span>
+                            <span>⏰ 時間: ${dateStr}</span>
+                            <span>📝 備註: ${note}</span>
                         </div>
                     </div>`;
-                document.getElementById(colId).innerHTML += card;
+                
+                const columnElement = document.getElementById(colId);
+                if (columnElement) columnElement.innerHTML += card;
             });
 
+            // 更新看板上方數字
             document.getElementById('stat-inbound').innerText = stats.inbound;
             document.getElementById('stat-alert').innerText = stats.alert;
             document.getElementById('stat-pending').innerText = counts['待處理'];
+            
+            // 更新欄位標題計數
             document.getElementById('count-pending').innerText = counts['待處理'];
             document.getElementById('count-progress').innerText = counts['執行中'];
             document.getElementById('count-done').innerText = counts['已完成'];
@@ -117,13 +140,22 @@
             if (type === '進貨預約') return 'tag-inbound';
             if (type === '出貨任務') return 'tag-outbound';
             if (type === '效期警示') return 'tag-alert';
-            return '';
+            if (type === '異常回報') return 'tag-alert';
+            return 'tag-other';
         }
 
-        function updateClock() { document.getElementById('live-clock').innerText = new Date().toLocaleString(); }
+        function updateClock() { 
+            document.getElementById('live-clock').innerText = new Date().toLocaleString(); 
+        }
+
         setInterval(updateClock, 1000);
+        // 每 5 分鐘自動刷新一次
         setInterval(fetchScheduleData, 300000);
-        window.onload = () => { updateClock(); fetchScheduleData(); };
+
+        window.onload = () => { 
+            updateClock(); 
+            fetchScheduleData(); 
+        };
     </script>
 </body>
 </html>
