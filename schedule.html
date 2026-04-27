@@ -3,159 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📊 極冷庫 | 任務排程看板</title>
+    <title>📊 TASK COMMAND CENTER | V1.0</title>
     <style>
         :root { 
-            --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
-            --bg: #020617; --card-bg: rgba(30, 41, 59, 0.5);
+            --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; 
+            --bg: #020617; --card-bg: rgba(30, 41, 59, 0.7);
             --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
         }
         * { box-sizing: border-box; font-family: 'Inter', "Noto Sans TC", sans-serif; }
-        body { background: var(--bg); color: var(--text-main); margin: 0; padding: 20px; overflow-x: hidden; }
+        body { background: var(--bg); color: var(--text-main); margin: 0; padding: 20px; }
 
-        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
-        .header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; color: var(--primary); }
-        #live-clock { color: var(--text-dim); font-family: monospace; font-size: 18px; }
+        /* 標題動畫：TASK COMMAND CENTER */
+        h1 { margin: 0; font-size: 28px; letter-spacing: 3px; font-weight: 800; text-transform: uppercase; }
 
-        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 20px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
-        .stat-card::after { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
-        .stat-card.urgent::after { background: var(--danger); }
-        .stat-card .val { font-size: 32px; font-weight: bold; margin-top: 5px; }
+        /* 副標題顏色變換：極冷庫任務排程系統 V1.0 */
+        .system-version {
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 5px;
+            background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-move 4s linear infinite;
+        }
 
-        .board-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; }
-        .board-column { background: rgba(255,255,255,0.02); border-radius: 24px; padding: 20px; min-height: 600px; border: 1px solid var(--border); }
-        .board-column h3 { margin-top: 0; display: flex; justify-content: space-between; align-items: center; color: var(--text-dim); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        .count-tag { background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+        @keyframes gradient-move {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
 
-        .task-card { background: #1e293b; border-radius: 16px; padding: 16px; margin-bottom: 15px; border: 1px solid var(--border); transition: 0.2s; }
-        .task-card:hover { transform: translateY(-3px); border-color: var(--primary); }
-        .task-tag { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: bold; margin-bottom: 8px; display: inline-block; }
-        .tag-inbound { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid #818cf8; }
-        .tag-outbound { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #34d399; }
-        .tag-alert { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #f87171; }
-        .tag-other { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid #94a3b8; }
+        /* 特效：效期示警呼吸燈 */
+        @keyframes alert-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 0.5); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 0.5); }
+        }
+        .alert-glow { border: 2px solid var(--danger) !important; animation: alert-pulse 2s infinite; background: rgba(239, 68, 68, 0.1) !important; }
 
-        .task-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; display: block; }
-        .task-info { font-size: 12px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .stat-group { display: flex; gap: 10px; }
+        .stat-item { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 20px; font-size: 13px; border: 1px solid var(--border); }
         
-        #loader { position: fixed; top: 20px; right: 20px; background: var(--primary); color: white; padding: 5px 15px; border-radius: 20px; display: none; z-index: 100; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; transition: 0.3s; }
+        .btn-primary { background: var(--primary); color: white; display: none; }
+        .btn-admin { background: rgba(255,255,255,0.1); color: var(--text-dim); }
+
+        .board-container { display: flex; gap: 20px; overflow-x: auto; min-height: 70vh; }
+        .board-column { flex: 1; min-width: 310px; background: rgba(255,255,255,0.02); border-radius: 15px; padding: 15px; border: 1px solid var(--border); }
+        .board-column h3 { margin: 0 0 15px 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; justify-content: space-between; }
+
+        .task-card { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; backdrop-filter: blur(10px); }
+        .task-card:hover { transform: translateY(-3px); border-color: var(--primary); background: rgba(30, 41, 59, 0.9); }
+        
+        .task-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: bold; display: inline-block; margin-bottom: 8px; }
+        .tag-inbound { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .tag-alert { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .tag-normal { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+
+        .arrival-info { margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 13px; color: var(--warning); font-weight: 600; }
+        .note-text { margin-top: 8px; font-size: 13px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 4px; border-left: 3px solid var(--primary); }
+        .time-label { font-size: 11px; color: var(--text-dim); display: block; margin-top: 8px; }
+
+        .status-menu { position: fixed; background: #1e293b; border: 1px solid var(--primary); border-radius: 10px; padding: 8px; z-index: 2000; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); min-width: 140px; }
+        .status-menu button { display: block; width: 100%; padding: 10px; background: transparent; border: none; color: white; text-align: left; cursor: pointer; border-radius: 6px; }
+        .status-menu button:hover { background: rgba(99, 102, 241, 0.2); }
+        .btn-delete { color: var(--danger) !important; border-top: 1px solid var(--border) !important; display: none; margin-top: 5px; }
+
+        #loader { position: fixed; top: 20px; right: 20px; background: var(--primary); padding: 8px 20px; border-radius: 30px; display: none; z-index: 3000; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
-    <div id="loader">⚙️ 同步中...</div>
+<div id="loader">⚙️ 正在同步資料...</div>
 
-    <div class="header">
-        <div><h1>TASK COMMAND CENTER</h1><small>極冷庫任務排程系統 V1.0</small></div>
-        <div id="live-clock"></div>
+<div class="header">
+    <div>
+        <h1>TASK COMMAND CENTER</h1>
+        <div class="system-version">極冷庫任務排程系統 V1.0</div>
+        <div id="live-clock" style="font-size:12px; color:var(--text-dim); margin-top: 5px;"></div>
     </div>
-
-    <div class="stat-grid">
-        <div class="stat-card"><small>今日預計進貨</small><div class="val" id="stat-inbound">0</div></div>
-        <div class="stat-card"><small>待處理任務</small><div class="val" id="stat-pending" style="color: var(--warning);">0</div></div>
-        <div class="stat-card urgent"><small>效期警示項目</small><div class="val" id="stat-alert" style="color: var(--danger);">0</div></div>
+    <div class="stat-group">
+        <div class="stat-item">進貨預約：<span id="stat-inbound">0</span></div>
+        <div class="stat-item">效期示警：<span id="stat-alert">0</span></div>
     </div>
+</div>
 
-    <div class="board-container">
-        <div class="board-column"><h3>待處理 <span class="count-tag" id="count-pending">0</span></h3><div id="col-pending"></div></div>
-        <div class="board-column"><h3>執行中 <span class="count-tag" id="count-progress">0</span></h3><div id="col-progress"></div></div>
-        <div class="board-column"><h3>已完成 <span class="count-tag" id="count-done">0</span></h3><div id="col-done"></div></div>
-    </div>
+<div class="controls">
+    <button id="auth-btn" class="btn btn-admin" onclick="authenticate()">🔒 管理員登入</button>
+    <button id="add-task-btn" class="btn btn-primary" onclick="addTaskWithArrival()">➕ 新建任務</button>
+</div>
 
-    <script>
-        // 這裡使用的是您提供的 GAS 部署網址 
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwOCwp9RommFfOY7BCZptvd4_4J6wKVHir-VrEuwgvPOS1yOOdV3qoDjq4A5Ums_loZ/exec";
+<div id="status-menu" class="status-menu">
+    <button onclick="updateStatus('待處理')">⏳ 待處理</button>
+    <button onclick="updateStatus('執行中')">🚀 執行中</button>
+    <button onclick="updateStatus('已完成')">✅ 已完成</button>
+    <button id="delete-opt" class="btn-delete" onclick="deleteTask()">🗑️ 刪除任務</button>
+</div>
 
-        async function fetchScheduleData() {
-            document.getElementById('loader').style.display = 'block';
+<div class="board-container">
+    <div class="board-column"><h3>⏳ 待處理 <span id="c-pending">0</span></h3><div id="col-pending"></div></div>
+    <div class="board-column"><h3>🚀 執行中 <span id="c-progress">0</span></h3><div id="col-progress"></div></div>
+    <div class="board-column"><h3>✅ 已完成 <span id="c-done">0</span></h3><div id="col-done"></div></div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSGXKa_EtiNUNTJ8Wy3HzFdxnFOEh7LqD_VEB9M-TtJNNcIhKUNKQL2TygUo1pqKMu/exec";
+    let isAdmin = false;
+    let selectedId = null;
+
+    function authenticate() {
+        if (prompt("管理員密碼：") === "admin123") {
+            isAdmin = true;
+            document.getElementById('auth-btn').style.display = 'none';
+            document.getElementById('add-task-btn').style.display = 'block';
+            document.getElementById('delete-opt').style.display = 'block';
+            alert("已登入");
+        }
+    }
+
+    function openMenu(e, id) {
+        e.stopPropagation();
+        selectedId = id;
+        const menu = document.getElementById('status-menu');
+        menu.style.display = 'block';
+        menu.style.top = `${Math.min(e.clientY, window.innerHeight - 200)}px`;
+        menu.style.left = `${Math.min(e.clientX, window.innerWidth - 160)}px`;
+    }
+
+    async function addTaskWithArrival() {
+        const content = prompt("1. 內容："); if (!content) return;
+        const type = prompt("2. 類型 (進貨預約/效期示警/一般)：", "一般");
+        const arrival = prompt("3. 預計到貨時間：", "未定");
+        const note = prompt("4. 備註事項：", "");
+
+        showLoader(true);
+        await fetch(SCRIPT_URL, { 
+            method: 'POST', 
+            mode: 'no-cors', 
+            body: JSON.stringify({ 
+                action: 'addTask', content, type, arrival,
+                time: new Date().toLocaleString('zh-TW', {hour12:false}),
+                note: note
+            })
+        });
+        setTimeout(fetchData, 1500);
+    }
+
+    async function updateStatus(status) {
+        if (!selectedId) return;
+        showLoader(true);
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateStatus', id: selectedId, status })});
+        setTimeout(fetchData, 1500);
+    }
+
+    async function deleteTask() {
+        if (!isAdmin || !selectedId || !confirm("確定刪除？")) return;
+        showLoader(true);
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'deleteTask', id: selectedId })});
+        setTimeout(fetchData, 1500);
+    }
+
+    async function fetchData() {
+        showLoader(true);
+        try {
+            const res = await fetch(`${SCRIPT_URL}?target=schedule`);
+            const data = await res.json();
+            render(data.schedule);
+        } catch (e) { console.error(e); }
+        showLoader(false);
+    }
+
+    function formatTime(rawStr) {
+        if (!rawStr || rawStr === "未設定" || rawStr === "未定") return rawStr || "未設定";
+        if (typeof rawStr === 'string' && rawStr.includes('T') && rawStr.includes('Z')) {
             try {
-                // 修正：target=schedule 確保呼叫 handleScheduleRequest() 
-                const res = await fetch(`${SCRIPT_URL}?target=schedule`);
-                const result = await res.json();
-                
-                // 修正：檢查後端回傳的關鍵字為 'schedule' 而非 'tasks' 
-                if (result.schedule && Array.isArray(result.schedule)) {
-                    updateUI(result.schedule);
-                }
-            } catch (e) { 
-                console.error("抓取資料失敗:", e); 
-            }
-            document.getElementById('loader').style.display = 'none';
+                const date = new Date(rawStr);
+                return date.getFullYear() + '/' + (date.getMonth() + 1).toString().padStart(2, '0') + '/' + date.getDate().toString().padStart(2, '0') + ' ' + date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+            } catch (e) { return rawStr; }
         }
+        return rawStr;
+    }
 
-        function updateUI(tasks) {
-            const cols = { '待處理': 'col-pending', '執行中': 'col-progress', '已完成': 'col-done' };
-            const counts = { '待處理': 0, '執行中': 0, '已完成': 0 };
-            let stats = { inbound: 0, alert: 0 };
+    function render(tasks) {
+        const cols = { '待處理': 'col-pending', '執行中': 'col-progress', '已完成': 'col-done' };
+        const counts = { '待處理': 0, '執行中': 0, '已完成': 0 };
+        let stats = { inbound: 0, alert: 0 };
 
-            // 清空舊卡片
-            Object.values(cols).forEach(id => document.getElementById(id).innerHTML = '');
+        Object.values(cols).forEach(id => document.getElementById(id).innerHTML = '');
 
-            tasks.forEach(t => {
-                // 對應 GAS 中定義的中文字段：時間, 類型, 內容, 狀態, 備註 
-                const status = t['狀態'] || '待處理';
-                const type = t['類型'] || '一般任務';
-                const content = t['內容'] || '無標題';
-                const time = t['時間'] || '';
-                const note = t['備註'] || '無';
-
-                // 更新統計數據
-                if (type === '進貨預約') stats.inbound++;
-                if (type === '效期警示') stats.alert++;
-                if (counts.hasOwnProperty(status)) counts[status]++;
-
-                const colId = cols[status] || 'col-pending';
-                const tagClass = getTagClass(type);
-                
-                // 格式化日期顯示
-                const dateStr = time ? new Date(time).toLocaleDateString() : '未定';
-
-                const card = `
-                    <div class="task-card">
-                        <span class="task-tag ${tagClass}">${type}</span>
-                        <span class="task-title">${content}</span>
-                        <div class="task-info">
-                            <span>⏰ 時間: ${dateStr}</span>
-                            <span>📝 備註: ${note}</span>
-                        </div>
-                    </div>`;
-                
-                const columnElement = document.getElementById(colId);
-                if (columnElement) columnElement.innerHTML += card;
-            });
-
-            // 更新看板上方數字
-            document.getElementById('stat-inbound').innerText = stats.inbound;
-            document.getElementById('stat-alert').innerText = stats.alert;
-            document.getElementById('stat-pending').innerText = counts['待處理'];
+        tasks.forEach(t => {
+            const status = t['狀態'] || '待處理';
+            const type = t['類型'] || '一般';
+            const id = t['id'];
             
-            // 更新欄位標題計數
-            document.getElementById('count-pending').innerText = counts['待處理'];
-            document.getElementById('count-progress').innerText = counts['執行中'];
-            document.getElementById('count-done').innerText = counts['已完成'];
-        }
+            const arrivalDisplay = formatTime(t['預計到貨時間'] || t['到貨時間'] || '未設定');
+            const createDisplay = formatTime(t['建立時間'] || t['時間/備註'] || t['時間'] || '無記錄');
+            const noteContent = t['備註'] || t['備註事項'] || null;
 
-        function getTagClass(type) {
-            if (type === '進貨預約') return 'tag-inbound';
-            if (type === '出貨任務') return 'tag-outbound';
-            if (type === '效期警示') return 'tag-alert';
-            if (type === '異常回報') return 'tag-alert';
-            return 'tag-other';
-        }
+            if (type.includes('進貨')) stats.inbound++;
+            if (type.includes('效期')) stats.alert++;
+            if (counts.hasOwnProperty(status)) counts[status]++;
 
-        function updateClock() { 
-            document.getElementById('live-clock').innerText = new Date().toLocaleString(); 
-        }
+            const isAlert = type.includes('效期');
+            const card = `
+                <div class="task-card ${isAlert ? 'alert-glow' : ''}" onclick="openMenu(event, '${id}')">
+                    <span class="task-tag ${type.includes('進貨')?'tag-inbound':(isAlert?'tag-alert':'tag-normal')}">${type}</span>
+                    <div style="font-weight:600; font-size:15px; margin-bottom:5px;">${t['內容']}</div>
+                    ${noteContent ? `<div class="note-text">📝 ${noteContent}</div>` : ''}
+                    <div class="arrival-info">🚚 到貨：${arrivalDisplay}</div>
+                    <span class="time-label">⏳ 建立於: ${createDisplay}</span>
+                </div>`;
+            if (cols[status]) document.getElementById(cols[status]).innerHTML += card;
+        });
 
-        setInterval(updateClock, 1000);
-        // 每 5 分鐘自動刷新一次
-        setInterval(fetchScheduleData, 300000);
+        document.getElementById('stat-inbound').innerText = stats.inbound;
+        document.getElementById('stat-alert').innerText = stats.alert;
+        document.getElementById('c-pending').innerText = counts['待處理'];
+        document.getElementById('c-progress').innerText = counts['執行中'];
+        document.getElementById('c-done').innerText = counts['已完成'];
+    }
 
-        window.onload = () => { 
-            updateClock(); 
-            fetchScheduleData(); 
-        };
-    </script>
+    function showLoader(s) { document.getElementById('loader').style.display = s ? 'block' : 'none'; }
+    window.onclick = () => document.getElementById('status-menu').style.display = 'none';
+    setInterval(() => { document.getElementById('live-clock').innerText = new Date().toLocaleString(); }, 1000);
+    window.onload = fetchData;
+</script>
 </body>
 </html>
