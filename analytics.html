@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 搜尋熱度分析 | 庫位優化中心</title>
+    <style>
+        :root { 
+            --primary: #6366f1; --accent: #10b981; --bg: #0f172a; 
+            --card-bg: rgba(30, 41, 59, 0.7); --text: #f8fafc; 
+            --dim: #94a3b8; --gold: #fbceb1;
+        }
+        
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        h1 { border-left: 6px solid var(--primary); padding-left: 15px; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { color: var(--dim); margin-bottom: 30px; font-size: 14px; }
+
+        /* 列表樣式 */
+        .stat-item { 
+            background: var(--card-bg); margin-bottom: 12px; padding: 18px 25px; 
+            border-radius: 15px; display: flex; align-items: center; 
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+        .stat-item:hover { transform: scale(1.02); border-color: var(--primary); background: rgba(30, 41, 59, 0.9); }
+
+        /* 排名圓圈 */
+        .rank { 
+            width: 40px; height: 40px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; margin-right: 20px; flex-shrink: 0;
+            background: rgba(255,255,255,0.1); font-size: 14px;
+        }
+        .rank-1 { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; box-shadow: 0 0 15px rgba(255,215,0,0.3); }
+        .rank-2 { background: linear-gradient(135deg, #c0c0c0, #708090); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #cd7f32, #8b4513); color: #000; }
+
+        /* 文字區 */
+        .content-area { flex-grow: 1; margin-right: 20px; }
+        .keyword { font-weight: 700; font-size: 18px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .advice { font-size: 12px; color: var(--accent); font-weight: 500; background: rgba(16, 185, 129, 0.1); padding: 2px 8px; border-radius: 4px; }
+
+        /* 動態長條圖 */
+        .bar-container { width: 150px; flex-shrink: 0; text-align: right; }
+        .bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-bottom: 5px; }
+        .bar-fill { 
+            height: 100%; background: var(--primary); border-radius: 4px; 
+            width: 0; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1); 
+        }
+        .count-text { font-size: 13px; color: var(--dim); font-weight: bold; }
+
+        /* 載入動畫 */
+        #loader { text-align: center; padding: 50px; color: var(--primary); font-weight: bold; }
+        .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>分析中心 | Search Hotspots</h1>
+    <p class="subtitle">根據搜尋頻率分析，為您建議最科學的庫位配置方案。</p>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        正在計算熱度數據...
+    </div>
+
+    <div id="statsList"></div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSGXKa_EtiNUNTJ8Wy3HzFdxnFOEh7LqD_VEB9M-TtJNNcIhKUNKQL2TygUo1pqKMu/exec";
+
+    async function fetchStats() {
+        const loader = document.getElementById('loader');
+        const list = document.getElementById('statsList');
+        
+        try {
+            const res = await fetch(`${SCRIPT_URL}?target=searchStats`);
+            if (!res.ok) throw new Error("網路請求失敗");
+            
+            const data = await res.json();
+            loader.style.display = 'none';
+
+            if (!data.stats || data.stats.length === 0) {
+                list.innerHTML = `<div style="text-align:center; color:var(--dim); margin-top:50px;">🚫 尚無搜尋紀錄數據</div>`;
+                return;
+            }
+
+            render(data.stats);
+        } catch (e) {
+            console.error(e);
+            loader.innerHTML = `❌ 無法取得數據：${e.message}<br><small>請確認 GAS 權限或 URL 是否正確</small>`;
+        }
+    }
+
+    function getAdvice(index, count) {
+        if (index === 0) return "🔥 極熱門：建議配置於出口首位";
+        if (index < 3) return "✨ 熱門：建議配置於黃金腰部高度";
+        if (count > 10) return "✅ 常態性：建議維持中層配置";
+        return "";
+    }
+
+    function render(stats) {
+        const list = document.getElementById('statsList');
+        const maxCount = Math.max(...stats.map(s => s.count));
+
+        list.innerHTML = stats.map((s, index) => {
+            const percentage = (s.count / maxCount) * 100;
+            const rankClass = index < 3 ? `rank-${index + 1}` : '';
+            const advice = getAdvice(index, s.count);
+
+            return `
+                <div class="stat-item">
+                    <div class="rank ${rankClass}">#${index + 1}</div>
+                    <div class="content-area">
+                        <div class="keyword">
+                            ${s.keyword}
+                            ${advice ? `<span class="advice">${advice}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-bg">
+                            <div class="bar-fill" data-width="${percentage}%"></div>
+                        </div>
+                        <div class="count-text">${s.count} 次搜尋</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 觸發進度條動畫
+        setTimeout(() => {
+            document.querySelectorAll('.bar-fill').forEach(bar => {
+                bar.style.width = bar.getAttribute('data-width');
+            });
+        }, 100);
+    }
+
+    window.onload = fetchStats;
+</script>
+</body>
+</html>
