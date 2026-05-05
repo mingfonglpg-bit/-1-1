@@ -29,7 +29,6 @@
         .expiry { color: #d9534f; font-weight: bold; }
         .sort-icon { font-size: 0.8em; margin-left: 5px; color: #bbb; }
 
-        /* 分頁控制項樣式 */
         .pagination { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; padding: 10px; background: white; border-radius: 8px; }
         .page-btn { padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .page-btn:hover:not(:disabled) { background: #f0f0f0; border-color: var(--primary); }
@@ -93,9 +92,10 @@
 </div>
 
 <script>
-    
-    const _pwd = 'ODg4OA=='; 
+    const _pwd = 'ODg4OA=='; // 密碼：8888
     const CSV_URL = 'https://mingfonglpg-bit.github.io/-1-1/擴充凍庫.xlsx';
+    // 請將此處替換為您部署 GAS 後取得的網頁應用程式 URL
+    const GAS_LOG_URL = 'https://script.google.com/macros/s/AKfycbziGYBAMUi2x2odoIN2VvBrQQVx1VwOiXS1y-IwNzfsoYPJDVEqIGOYbh09sS7q9N-o/exec';
 
     const db = new Dexie("InventoryDB");
     db.version(2).stores({ 
@@ -103,7 +103,6 @@
         searchLogs: '++id, keyword, count' 
     });
 
-    // 分頁與排序狀態
     let allFilteredData = [];
     let currentPage = 1;
     const itemsPerPage = 15; 
@@ -156,7 +155,7 @@
     }
 
     function onSearchInput() {
-        currentPage = 1; // 搜尋時回到第一頁
+        currentPage = 1;
         handleSearch();
         const kw = document.getElementById('searchInput').value.trim();
         clearTimeout(searchTimer);
@@ -164,9 +163,24 @@
     }
 
     async function logSearch(kw) {
+        // 1. 本地統計
         const log = await db.searchLogs.where('keyword').equals(kw).first();
         if (log) await db.searchLogs.update(log.id, { count: log.count + 1 });
         else await db.searchLogs.add({ keyword: kw, count: 1 });
+
+        // 2. 雲端同步至 SearchLogs 試算表
+        try {
+            fetch(GAS_LOG_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({
+                    keyword: kw,
+                    source: 'Offline_System_V18.3'
+                })
+            });
+        } catch (e) {
+            console.error("雲端紀錄失敗:", e);
+        }
     }
 
     async function handleSearch() {
@@ -182,10 +196,8 @@
     function toggleSort(field) {
         if (currentSortField === field) currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
         else { currentSortField = field; currentSortOrder = 'asc'; }
-        
         document.querySelectorAll('.sort-icon').forEach(el => el.innerText = '⇅');
         document.getElementById(`sort-${field}`).innerText = currentSortOrder === 'asc' ? '▲' : '▼';
-        
         applySort();
         renderTable();
     }
@@ -198,11 +210,9 @@
         });
     }
 
-    // --- 核心分頁渲染邏輯 ---
     function renderTable() {
         const totalPages = Math.ceil(allFilteredData.length / itemsPerPage) || 1;
         if (currentPage > totalPages) currentPage = totalPages;
-
         const start = (currentPage - 1) * itemsPerPage;
         const end = start + itemsPerPage;
         const pageData = allFilteredData.slice(start, end);
@@ -218,11 +228,9 @@
             </tr>
         `).join('') || '<tr><td colspan="6" style="text-align:center; padding:20px;">無相符資料</td></tr>';
 
-        // 更新分頁文字與按鈕狀態
         document.getElementById('pageInfo').innerText = `第 ${currentPage} / ${totalPages} 頁`;
         document.getElementById('prevBtn').disabled = (currentPage === 1);
         document.getElementById('nextBtn').disabled = (currentPage === totalPages);
-        
         document.getElementById('dataCount').innerText = `總計資料：${allFilteredData.length} 筆`;
         document.getElementById('syncTime').innerText = `最後更新：${localStorage.getItem('lastUpdate') || '無'}`;
     }
@@ -230,7 +238,7 @@
     function changePage(step) {
         currentPage += step;
         renderTable();
-        window.scrollTo(0, 0); // 換頁後自動回到最上方
+        window.scrollTo(0, 0);
     }
 
     function verifyAdmin() {
@@ -263,7 +271,10 @@
         }
     }
 
-    (async () => { allFilteredData = await db.stocks.toArray(); renderTable(); })();
+    (async () => { 
+        allFilteredData = await db.stocks.toArray(); 
+        renderTable(); 
+    })();
 </script>
 </body>
 </html>
