@@ -24,7 +24,7 @@
             margin: 0; 
             padding: 0; 
             font-size: 14px;
-            overflow-x: hidden; /* 防止字卡滑出時產生網頁水平滾動條 */
+            overflow-x: hidden;
         }
         
         .container { 
@@ -78,6 +78,7 @@
         .floor-detail { font-size: 11px; color: var(--text-dim); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px; }
         .stat-num-highlight { color: var(--stat-num); font-weight: bold; }
 
+        /* 👑 六個按鈕專屬外觀與專屬霓虹特效樣式設定 */
         .header-tools { 
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -91,19 +92,34 @@
         .btn-main { 
             padding: 12px 14px; 
             border-radius: 12px; 
-            border: none; 
-            background: var(--primary); 
+            border: 1px solid transparent; 
             color: white; 
             cursor: pointer; 
             font-weight: bold; 
             font-size: 14px;
-            transition: 0.2s; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
             display: inline-flex; 
             align-items: center; 
             justify-content: center; 
             gap: 6px;
         }
-        .btn-main:active { transform: scale(0.97); opacity: 0.9; }
+        .btn-main:active { transform: scale(0.95); opacity: 0.9; }
+
+        /* 六色預設基底 */
+        #warningBtn { background: #d97706; } /* 琥珀金 */
+        #markBtn { background: #7c3aed; }    /* 霓虹紫 */
+        #exportBtn { background: #059669; }  /* 翡翠綠 */
+        #logBtn { background: #2563eb; }     /* 寶石藍 */
+        #adminPanelBtn { background: #4b5563; } /* 石墨灰 */
+        #adminLoginBtn { background: #dc2626; } /* 火焰紅 */
+
+        /* 👑 按了之後的變色與特效（啟用狀態/點擊瞬間反饋） */
+        #warningBtn.active, #warningBtn:focus { background: #f59e0b; box-shadow: 0 0 15px #f59e0b; border-color: #fff; }
+        #markBtn.active, #markBtn:focus { background: #a855f7; box-shadow: 0 0 15px #a855f7; border-color: #fff; }
+        #exportBtn:focus { background: #10b981; box-shadow: 0 0 15px #10b981; border-color: #fff; }
+        #logBtn:focus { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; border-color: #fff; }
+        #adminPanelBtn.active, #adminPanelBtn:focus { background: #6b7280; box-shadow: 0 0 15px #6b7280; border-color: #fff; }
+        #adminLoginBtn.active, #adminLoginBtn:focus { background: #ef4444; box-shadow: 0 0 15px #ef4444; border-color: #fff; }
 
         .map-section { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
         .visual-grid { 
@@ -153,7 +169,6 @@
             margin-bottom: 20px;
         }
 
-        /* 👑 優化手機字卡：加入滑動動畫轉場與觸控手動安全防護 */
         .info-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border);
@@ -164,12 +179,11 @@
             flex-direction: column;
             gap: 8px;
             transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
-            touch-action: pan-y; /* 允許原生瀏覽器垂直捲動，水平保留給 JS 滑動手勢 */
+            touch-action: pan-y; 
             max-height: 300px;
             opacity: 1;
         }
         
-        /* 當滑動被觸發消除時的平滑上移與縮小消失特效 */
         .info-card.swiped-out {
             opacity: 0 !important;
             max-height: 0 !important;
@@ -178,7 +192,7 @@
             margin-top: 0 !important;
             margin-bottom: -12px !important;
             border-color: transparent !important;
-            transform: translateX(100vw) !important; /* 預設向右滑開，JS 會動態覆蓋方向 */
+            transform: translateX(100vw) !important; 
             pointer-events: none;
         }
         .info-card.swiped-out-left {
@@ -342,12 +356,12 @@
     </div>
 
     <header class="header-tools">
-        <button id="warningBtn" onclick="toggleWarningMode()" class="btn-main" style="background:#4b5563">🕒 即期預警</button>
-        <button id="markBtn" onclick="toggleMarkMode()" class="btn-main" style="background:#4b5563">📍 標記模式</button>
-        <button onclick="exportExcel()" class="btn-main" style="background:var(--edit)">💾 匯出 Excel</button>
-        <button onclick="exportActionLogs()" class="btn-main" style="background:var(--primary)">📋 行為日誌</button>
-        <button onclick="toggleAdminPanel()" class="btn-main" style="background:#475569;">🛠️ 維護管理</button>
-        <button id="adminLoginBtn" onclick="adminLogin()" class="btn-main" style="background:#1e293b; border:1px solid var(--primary)">🔐 管理模式</button>
+        <button id="warningBtn" onclick="toggleWarningMode()" class="btn-main">🕒 即期預警</button>
+        <button id="markBtn" onclick="toggleMarkMode()" class="btn-main">📍 標記模式</button>
+        <button id="exportBtn" onclick="exportExcel()" class="btn-main">💾 匯出 Excel</button>
+        <button id="logBtn" onclick="exportActionLogs()" class="btn-main">📋 行為日誌</button>
+        <button id="adminPanelBtn" onclick="toggleAdminPanel()" class="btn-main">🛠️ 維護管理</button>
+        <button id="adminLoginBtn" onclick="adminLogin()" class="btn-main">🔐 管理模式</button>
     </header>
 
     <div id="admin-panel" style="display:none; margin-bottom:20px; background:rgba(255,255,255,0.04); padding:16px; border-radius:16px; border: 1px solid var(--border);">
@@ -360,9 +374,9 @@
 
     <section class="map-section">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <b style="font-size:15px;">📌 儲位地圖</b>
+            <b style="font-size:15px;">📌 儲位可視化地圖</b>
             <div style="display:flex; gap:6px;">
-                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-慢</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
                 <select id="vFloor" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
         </div>
@@ -415,7 +429,7 @@
     let currentPage = 1, rowsPerPage = 10;
     let hiddenCardDetails = new Set();
     let hiddenCards = new Set();
-    let swipedCardIds = new Set(); // 👑 儲存被滑動消除隱藏的字卡 ID
+    let swipedCardIds = new Set(); 
     let actionLogs = [];
     let searchDebounceTimer = null;
 
@@ -506,7 +520,6 @@
             filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
         }
         
-        // 👑 排除手勢向左/右滑動消除隱藏的字卡項目，讓下方資料能往上遞補
         filtered = filtered.filter(x => !swipedCardIds.has(x.id));
         
         if (currentSort.key) {
@@ -514,8 +527,6 @@
         }
         
         const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
-        
-        // 👑 安全機制：避免消除字卡後，當前頁碼超出最新總頁數導致卡死
         if (currentPage > totalPages) currentPage = totalPages;
 
         const data = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -552,7 +563,7 @@
             </tr>`;
         }).join('');
 
-        // 2. 手機版字卡輸出 (👑 增加 data-id 以供滑動手勢精準識別)
+        // 2. 手機版字卡輸出
         listContainer.innerHTML = data.map(i => {
             const s = checkDateStatus(i);
             const isScrapped = (s === 3); 
@@ -579,31 +590,25 @@
             </div>`;
         }).join('');
 
-        // 👑 修正分頁器點選觸發機制：確保傳遞正確的變數與當前最新總頁數
         document.getElementById('pagination').innerHTML = `
             <button class="btn-main" style="padding:8px 14px;" onclick="changeP(-1, ${totalPages})">上一頁</button> 
             <span style="margin:0 10px; font-weight:bold;">${currentPage} / ${totalPages}</span> 
             <button class="btn-main" style="padding:8px 14px;" onclick="changeP(1, ${totalPages})">下一頁</button>
         `;
 
-        // 👑 核心新增：重新綁定當前頁面所有手機字卡的滑動消除事件監聽器
         bindSwipeEvents();
     }
 
-    // 👑 全新核心函式：實現字卡左右滑動消除、往上遞補特效
     function bindSwipeEvents() {
         const cards = document.querySelectorAll('.info-card');
         cards.forEach(card => {
-            let startX = 0;
-            let startY = 0;
-            let moveX = 0;
-            let isSwiping = false;
+            let startX = 0, startY = 0, moveX = 0, isSwiping = false;
 
             card.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
                 isSwiping = true;
-                card.style.transition = 'none'; // 觸摸時暫時取消動畫以達成極致跟手感
+                card.style.transition = 'none';
             }, { passive: true });
 
             card.addEventListener('touchmove', (e) => {
@@ -611,14 +616,11 @@
                 moveX = e.touches[0].clientX - startX;
                 let moveY = e.touches[0].clientY - startY;
 
-                // 物理防誤觸：如果垂直滑動大於水平滑動，視為一般網頁滾動，不觸發滑動消除
                 if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveX) < 10) {
                     isSwiping = false;
                     card.style.transform = '';
                     return;
                 }
-
-                // 跟隨手指左右滑動位移
                 card.style.transform = `translateX(${moveX}px)`;
                 card.style.opacity = (1 - Math.abs(moveX) / 300).toString();
             }, { passive: true });
@@ -628,24 +630,18 @@
                 isSwiping = false;
                 card.style.transition = 'all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
-                // 滑動閥值：當滑動超過 100 像素時視為完全消除
                 if (Math.abs(moveX) > 100) {
                     const itemId = parseInt(card.getAttribute('data-id'));
-                    
-                    // 根據滑動方向加上向左或向右對應的飛出 CSS 類別
                     if (moveX > 0) {
                         card.classList.add('swiped-out');
                     } else {
                         card.classList.add('swiped-out', 'swiped-out-left');
                     }
-
-                    // 動態等待 CSS 位飛出轉場動畫結束後，將其從資料集排除並重新渲染（下方自動遞補上移）
                     setTimeout(() => {
                         swipedCardIds.add(itemId);
-                        renderTable(); // 重新計算渲染分頁與字卡，完美往上遞補
+                        renderTable();
                     }, 200);
                 } else {
-                    // 滑動不足，彈回原位
                     card.style.transform = '';
                     card.style.opacity = '1';
                 }
@@ -654,7 +650,6 @@
         });
     }
 
-    // 👑 修正分頁切換：確保上下跳頁時，兩邊視圖皆完美重繪重綁
     function changeP(step, maxPages) { 
         currentPage = Math.max(1, Math.min(maxPages, currentPage + step)); 
         renderTable(); 
@@ -703,31 +698,39 @@
         }
     }
 
-    // 👑 完美修復：統計字卡關閉點選事件處理
     function closeStatCard(event, zoneName) {
         event.stopPropagation();
         hiddenCards.add(zoneName); 
-        // 針對冷藏左做對應相容
         const targetId = zoneName === "冷藏庫-左" ? "card-冷藏庫-text-left" : `card-${zoneName}`;
         const cardEl = document.getElementById(targetId);
         if(cardEl) cardEl.style.display = 'none';
     }
 
+    /* 👑 預警切換：同步控制 active 類別以顯示霓虹外框 */
     function toggleWarningMode() { 
         isWarningMode = !isWarningMode; 
-        document.getElementById('warningBtn').style.background = isWarningMode ? 'var(--warning)' : '#4b5563';
-        if (isWarningMode) { isMarkMode = false; document.getElementById('markBtn').style.background = '#4b5563'; }
+        const btn = document.getElementById('warningBtn');
+        if (isWarningMode) {
+            btn.classList.add('active');
+            isMarkMode = false; 
+            document.getElementById('markBtn').classList.remove('active');
+        } else {
+            btn.classList.remove('active');
+        }
         currentPage = 1;
         renderAll(); 
     }
     
+    /* 👑 標記切換：同步控制 active 類別以顯示霓虹外框 */
     function toggleMarkMode() { 
         isMarkMode = !isMarkMode; 
-        document.getElementById('markBtn').style.background = isMarkMode ? 'var(--marked)' : '#4b5563'; 
+        const btn = document.getElementById('markBtn');
         if (isMarkMode) { 
+            btn.classList.add('active');
             isWarningMode = false; 
-            document.getElementById('warningBtn').style.background = '#4b5563'; 
+            document.getElementById('warningBtn').classList.remove('active');
         } else {
+            btn.classList.remove('active');
             logAction("標記篩選", `使用者篩選並觀看標記的 ${markedPos.size} 個庫位`);
         } 
         currentPage = 1;
@@ -796,13 +799,37 @@
         closeModal(); saveDataLocal();
     }
 
+    /* 👑 管理模式登入：同步控制 active 狀態及文字顯示 */
     function adminLogin() { 
-        if (!isAdmin) { const pw = prompt("密碼:"); if (pw === "admin123") isAdmin = true; else return; } else isAdmin = false; 
-        document.getElementById('adminLoginBtn').innerText = isAdmin ? "🔓 管理中" : "🔐 管理模式"; 
+        const btn = document.getElementById('adminLoginBtn');
+        if (!isAdmin) { 
+            const pw = prompt("密碼:"); 
+            if (pw === "admin123") {
+                isAdmin = true; 
+                btn.classList.add('active');
+            } else return; 
+        } else { 
+            isAdmin = false; 
+            btn.classList.remove('active');
+        } 
+        btn.innerText = isAdmin ? "🔓 管理中" : "🔐 管理模式"; 
         document.getElementById('manualAddBtn').style.display = isAdmin ? 'inline-block' : 'none'; 
         renderTable(); 
     }
     
+    /* 👑 維護管理面板切換：控制面板按鈕 active 類別 */
+    function toggleAdminPanel() { 
+        const p = document.getElementById('admin-panel'); 
+        const btn = document.getElementById('adminPanelBtn');
+        if(p.style.display === 'none') {
+            p.style.display = 'block';
+            btn.classList.add('active');
+        } else {
+            p.style.display = 'none';
+            btn.classList.remove('active');
+        }
+    }
+
     function updateStats() {
         const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-left", "冷藏庫-右", "常溫區"];
         zones.forEach(z => {
@@ -846,7 +873,7 @@
     function clearSearch() { 
         document.getElementById('searchInput').value = ''; 
         markedPos.clear();
-        swipedCardIds.clear(); // 👑 清除搜尋時同步還原滑動消除的字卡
+        swipedCardIds.clear(); 
         logAction("搜尋查詢", `重置總覽`); 
         renderAll(); 
     }
@@ -858,7 +885,6 @@
     }
     
     function closeModal() { document.getElementById('itemModal').style.display = 'none'; }
-    function toggleAdminPanel() { const p = document.getElementById('admin-panel'); p.style.display = p.style.display==='none'?'block':'none'; }
     function saveDataLocal() { localStorage.setItem('offlineData_V23_7', JSON.stringify(inventory)); renderAll(); }
     function renderAll() { renderVisual(); renderTable(); }
     
@@ -882,7 +908,7 @@
                     note: String(r[7]||"") 
                 };
             }).filter(x => x.zone); 
-            swipedCardIds.clear(); // 匯入時清空滑動狀態
+            swipedCardIds.clear(); 
             logAction("系統匯入", `匯入全庫資料共 ${inventory.length} 筆。`);
             saveDataLocal(); 
         }; 
