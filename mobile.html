@@ -24,6 +24,7 @@
             margin: 0; 
             padding: 0; 
             font-size: 14px;
+            overflow-x: hidden; /* 防止字卡滑出時產生網頁水平滾動條 */
         }
         
         .container { 
@@ -145,7 +146,6 @@
         .search-input { width: 100%; padding: 14px 45px 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: #1e293b; color: white; font-size: 15px; box-sizing: border-box; }
         .search-clear { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); font-size: 20px; padding: 4px; }
 
-        /* 手機與桌機通用字卡/表格列點選標記樣式 */
         .card-list-container {
             display: flex;
             flex-direction: column;
@@ -153,6 +153,7 @@
             margin-bottom: 20px;
         }
 
+        /* 👑 優化手機字卡：加入滑動動畫轉場與觸控手動安全防護 */
         .info-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border);
@@ -162,15 +163,32 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            transition: all 0.25s ease;
+            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+            touch-action: pan-y; /* 允許原生瀏覽器垂直捲動，水平保留給 JS 滑動手勢 */
+            max-height: 300px;
+            opacity: 1;
         }
         
-        /* 標記模式進行中，讓滑鼠或手指知道可以點選 */
+        /* 當滑動被觸發消除時的平滑上移與縮小消失特效 */
+        .info-card.swiped-out {
+            opacity: 0 !important;
+            max-height: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: -12px !important;
+            border-color: transparent !important;
+            transform: translateX(100vw) !important; /* 預設向右滑開，JS 會動態覆蓋方向 */
+            pointer-events: none;
+        }
+        .info-card.swiped-out-left {
+            transform: translateX(-100vw) !important;
+        }
+        
         .in-mark-mode .info-card, .in-mark-mode tbody tr {
             cursor: pointer !important;
         }
         
-        /* 👑 點選中字卡的霓虹紫色外框特效 */
         .info-card.card-selected {
             border: 2px solid #c084fc !important;
             box-shadow: 0 0 15px rgba(168, 85, 247, 0.6);
@@ -178,7 +196,6 @@
             transform: scale(1.01);
         }
         
-        /* 桌機表格行選取特效 */
         tr.row-selected td {
             background: rgba(168, 85, 247, 0.15) !important;
             border-top: 1px solid #c084fc !important;
@@ -294,7 +311,7 @@
     <div class="dashboard">
         <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
             <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-左')">✖</span>
-            <div style="font-size:12px;">極冷左空位 <span id="arrow-極冷庫-左">▼</span></div>
+            <div style="font-size:12px;">極冷左空位 <span id="arrow-極冷庫-escape">▼</span></div>
             <div id="empty-極冷庫-左" class="stat-value">--</div>
             <div id="detail-極冷庫-左" class="floor-detail"></div>
         </div>
@@ -304,8 +321,8 @@
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="floor-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-慢')">✖</span>
+        <div class="stat-card" id="card-冷藏庫-text-left" onclick="toggleCardDetail('冷藏庫-左')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-左')">✖</span>
             <div style="font-size:12px;">冷藏左空位 <span id="arrow-冷藏庫-左">▼</span></div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
             <div id="detail-冷藏庫-左" class="floor-detail"></div>
@@ -345,7 +362,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <b style="font-size:15px;">📌 儲位可視化地圖</b>
             <div style="display:flex; gap:6px;">
-                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-慢</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
                 <select id="vFloor" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
         </div>
@@ -398,6 +415,7 @@
     let currentPage = 1, rowsPerPage = 10;
     let hiddenCardDetails = new Set();
     let hiddenCards = new Set();
+    let swipedCardIds = new Set(); // 👑 儲存被滑動消除隱藏的字卡 ID
     let actionLogs = [];
     let searchDebounceTimer = null;
 
@@ -463,17 +481,9 @@
         updateStats();
     }
 
-    // 👑 點擊字卡或表格列時的選取處理
     function handleItemRowClick(event, fullPos) {
-        // 如果不是標記模式，或是點到按鈕，不執行標記
         if (!isMarkMode || event.target.classList.contains('action-btn')) return;
-        
-        if (markedPos.has(fullPos)) {
-            markedPos.delete(fullPos);
-        } else {
-            markedPos.add(fullPos);
-        }
-        // 即時刷新畫面渲染特效
+        if (markedPos.has(fullPos)) { markedPos.delete(fullPos); } else { markedPos.add(fullPos); }
         renderVisual();
         renderTable();
     }
@@ -485,7 +495,6 @@
         if (isWarningMode) {
             filtered = inventory.filter(x => checkDateStatus(x) === 1);
         } else if (isMarkMode && markedPos.size > 0 && kw === '') {
-            // 👑 當二次按下標記鈕結束時，或需要過濾時直接呈現所選庫位
             filtered = inventory.filter(x => markedPos.has(x.fullPos));
         } else if (kw.startsWith("pos:")) {
             const targetPos = kw.replace("pos:", "");
@@ -497,14 +506,20 @@
             filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
         }
         
+        // 👑 排除手勢向左/右滑動消除隱藏的字卡項目，讓下方資料能往上遞補
+        filtered = filtered.filter(x => !swipedCardIds.has(x.id));
+        
         if (currentSort.key) {
             filtered.sort((a,b) => (a[currentSort.key] || "").localeCompare(b[currentSort.key] || "", undefined, {numeric:true}) * currentSort.order);
         }
         
         const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        
+        // 👑 安全機制：避免消除字卡後，當前頁碼超出最新總頁數導致卡死
+        if (currentPage > totalPages) currentPage = totalPages;
+
         const data = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-        // 標記模式狀態標籤加入 CSS 類別
         const listContainer = document.getElementById('cardListBody');
         const tableContainer = document.getElementById('tableBody');
         
@@ -537,13 +552,13 @@
             </tr>`;
         }).join('');
 
-        // 2. 手機版字卡輸出
+        // 2. 手機版字卡輸出 (👑 增加 data-id 以供滑動手勢精準識別)
         listContainer.innerHTML = data.map(i => {
             const s = checkDateStatus(i);
             const isScrapped = (s === 3); 
             const isSelected = markedPos.has(i.fullPos);
             const colorClass = i.fullPos.includes('極冷') ? 'bg-cold' : (i.fullPos.includes('冷藏') ? 'bg-chill' : 'bg-ambient');
-            return `<div class="info-card ${isSelected ? 'card-selected' : ''}" onclick="handleItemRowClick(event, '${i.fullPos}')">
+            return `<div class="info-card ${isSelected ? 'card-selected' : ''}" data-id="${i.id}" onclick="handleItemRowClick(event, '${i.fullPos}')">
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
                     <span class="pos-badge ${colorClass}">${i.fullPos}</span>
                     <span style="font-size:12px; color:var(--text-dim);">批號: <b>${i.batch}</b></span>
@@ -564,7 +579,85 @@
             </div>`;
         }).join('');
 
-        document.getElementById('pagination').innerHTML = `<button class="btn-main" style="padding:8px 14px;" onclick="changeP(-1,totalPages)">上一頁</button> <span style="margin:0 10px; font-weight:bold;">${currentPage} / ${totalPages}</span> <button class="btn-main" style="padding:8px 14px;" onclick="changeP(1,totalPages)">下一頁</button>`;
+        // 👑 修正分頁器點選觸發機制：確保傳遞正確的變數與當前最新總頁數
+        document.getElementById('pagination').innerHTML = `
+            <button class="btn-main" style="padding:8px 14px;" onclick="changeP(-1, ${totalPages})">上一頁</button> 
+            <span style="margin:0 10px; font-weight:bold;">${currentPage} / ${totalPages}</span> 
+            <button class="btn-main" style="padding:8px 14px;" onclick="changeP(1, ${totalPages})">下一頁</button>
+        `;
+
+        // 👑 核心新增：重新綁定當前頁面所有手機字卡的滑動消除事件監聽器
+        bindSwipeEvents();
+    }
+
+    // 👑 全新核心函式：實現字卡左右滑動消除、往上遞補特效
+    function bindSwipeEvents() {
+        const cards = document.querySelectorAll('.info-card');
+        cards.forEach(card => {
+            let startX = 0;
+            let startY = 0;
+            let moveX = 0;
+            let isSwiping = false;
+
+            card.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                isSwiping = true;
+                card.style.transition = 'none'; // 觸摸時暫時取消動畫以達成極致跟手感
+            }, { passive: true });
+
+            card.addEventListener('touchmove', (e) => {
+                if (!isSwiping) return;
+                moveX = e.touches[0].clientX - startX;
+                let moveY = e.touches[0].clientY - startY;
+
+                // 物理防誤觸：如果垂直滑動大於水平滑動，視為一般網頁滾動，不觸發滑動消除
+                if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveX) < 10) {
+                    isSwiping = false;
+                    card.style.transform = '';
+                    return;
+                }
+
+                // 跟隨手指左右滑動位移
+                card.style.transform = `translateX(${moveX}px)`;
+                card.style.opacity = (1 - Math.abs(moveX) / 300).toString();
+            }, { passive: true });
+
+            card.addEventListener('touchend', () => {
+                if (!isSwiping) return;
+                isSwiping = false;
+                card.style.transition = 'all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+                // 滑動閥值：當滑動超過 100 像素時視為完全消除
+                if (Math.abs(moveX) > 100) {
+                    const itemId = parseInt(card.getAttribute('data-id'));
+                    
+                    // 根據滑動方向加上向左或向右對應的飛出 CSS 類別
+                    if (moveX > 0) {
+                        card.classList.add('swiped-out');
+                    } else {
+                        card.classList.add('swiped-out', 'swiped-out-left');
+                    }
+
+                    // 動態等待 CSS 位飛出轉場動畫結束後，將其從資料集排除並重新渲染（下方自動遞補上移）
+                    setTimeout(() => {
+                        swipedCardIds.add(itemId);
+                        renderTable(); // 重新計算渲染分頁與字卡，完美往上遞補
+                    }, 200);
+                } else {
+                    // 滑動不足，彈回原位
+                    card.style.transform = '';
+                    card.style.opacity = '1';
+                }
+                moveX = 0;
+            });
+        });
+    }
+
+    // 👑 修正分頁切換：確保上下跳頁時，兩邊視圖皆完美重繪重綁
+    function changeP(step, maxPages) { 
+        currentPage = Math.max(1, Math.min(maxPages, currentPage + step)); 
+        renderTable(); 
     }
 
     function handleCardSelectSort(val) {
@@ -610,10 +703,13 @@
         }
     }
 
+    // 👑 完美修復：統計字卡關閉點選事件處理
     function closeStatCard(event, zoneName) {
         event.stopPropagation();
         hiddenCards.add(zoneName); 
-        const cardEl = document.getElementById(`card-${zoneName}`);
+        // 針對冷藏左做對應相容
+        const targetId = zoneName === "冷藏庫-左" ? "card-冷藏庫-text-left" : `card-${zoneName}`;
+        const cardEl = document.getElementById(targetId);
         if(cardEl) cardEl.style.display = 'none';
     }
 
@@ -625,7 +721,6 @@
         renderAll(); 
     }
     
-    // 👑 標記模式切換：點擊按鈕選取完，再點一次立刻篩選呈現所選庫位
     function toggleMarkMode() { 
         isMarkMode = !isMarkMode; 
         document.getElementById('markBtn').style.background = isMarkMode ? 'var(--marked)' : '#4b5563'; 
@@ -633,7 +728,6 @@
             isWarningMode = false; 
             document.getElementById('warningBtn').style.background = '#4b5563'; 
         } else {
-            // 當關閉標記模式時不清除清單，以便清單立刻顯示出標記的項目
             logAction("標記篩選", `使用者篩選並觀看標記的 ${markedPos.size} 個庫位`);
         } 
         currentPage = 1;
@@ -709,13 +803,12 @@
         renderTable(); 
     }
     
-    // 👑 已修正極冷左的 DOM 與分層數值計算渲染
     function updateStats() {
         const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-left", "冷藏庫-右", "常溫區"];
         zones.forEach(z => {
-            // 轉換界面上統一的中文 ID 識別
             const domId = z === "冷藏庫-left" ? "冷藏庫-左" : z;
-            const cardEl = document.getElementById(`card-${domId}`);
+            const targetCardId = domId === "冷藏庫-左" ? "card-冷藏庫-text-left" : `card-${domId}`;
+            const cardEl = document.getElementById(targetCardId);
             if (hiddenCards.has(domId)) { if (cardEl) cardEl.style.display = 'none'; return; } 
             else { if (cardEl) cardEl.style.display = 'block'; }
 
@@ -723,7 +816,6 @@
             ["1F","2F","3F","4F"].forEach(f => { 
                 let floorOcc = 0;
                 for(let i=1; i<=22; i++) {
-                    // 相容匯入時冷藏庫-left的歷史資料集
                     if(inventory.some(x => x.fullPos === `${domId}${f}-${i}` || x.fullPos === `${z}${f}-${i}`)) { 
                         floorOcc++; totalOcc++; 
                     }
@@ -753,7 +845,8 @@
 
     function clearSearch() { 
         document.getElementById('searchInput').value = ''; 
-        markedPos.clear(); // 清除搜尋時同時重置標記
+        markedPos.clear();
+        swipedCardIds.clear(); // 👑 清除搜尋時同步還原滑動消除的字卡
         logAction("搜尋查詢", `重置總覽`); 
         renderAll(); 
     }
@@ -764,7 +857,6 @@
         renderTable(); 
     }
     
-    function changeP(s,m) { currentPage = Math.max(1, Math.min(m, currentPage+s)); renderTable(); }
     function closeModal() { document.getElementById('itemModal').style.display = 'none'; }
     function toggleAdminPanel() { const p = document.getElementById('admin-panel'); p.style.display = p.style.display==='none'?'block':'none'; }
     function saveDataLocal() { localStorage.setItem('offlineData_V23_7', JSON.stringify(inventory)); renderAll(); }
@@ -790,6 +882,7 @@
                     note: String(r[7]||"") 
                 };
             }).filter(x => x.zone); 
+            swipedCardIds.clear(); // 匯入時清空滑動狀態
             logAction("系統匯入", `匯入全庫資料共 ${inventory.length} 筆。`);
             saveDataLocal(); 
         }; 
