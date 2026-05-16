@@ -78,7 +78,7 @@
         .floor-detail { font-size: 11px; color: var(--text-dim); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px; }
         .stat-num-highlight { color: var(--stat-num); font-weight: bold; }
 
-        /* 👑 六個按鈕專屬外觀與專屬霓虹特效樣式設定 */
+        /* 六個按鈕專屬外觀與專屬霓虹特效樣式設定 */
         .header-tools { 
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -113,13 +113,23 @@
         #adminPanelBtn { background: #4b5563; } /* 石墨灰 */
         #adminLoginBtn { background: #dc2626; } /* 火焰紅 */
 
-        /* 👑 按了之後的變色與特效（啟用狀態/點擊瞬間反饋） */
+        /* 按了之後的變色與特效（啟用狀態/點擊瞬間反饋） */
         #warningBtn.active, #warningBtn:focus { background: #f59e0b; box-shadow: 0 0 15px #f59e0b; border-color: #fff; }
         #markBtn.active, #markBtn:focus { background: #a855f7; box-shadow: 0 0 15px #a855f7; border-color: #fff; }
         #exportBtn:focus { background: #10b981; box-shadow: 0 0 15px #10b981; border-color: #fff; }
         #logBtn:focus { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; border-color: #fff; }
         #adminPanelBtn.active, #adminPanelBtn:focus { background: #6b7280; box-shadow: 0 0 15px #6b7280; border-color: #fff; }
         #adminLoginBtn.active, #adminLoginBtn:focus { background: #ef4444; box-shadow: 0 0 15px #ef4444; border-color: #fff; }
+
+        /* 👑 本次修正重點：首頁「啟動系統」、分頁「上一頁」、「下一頁」獨立顏色與專屬點擊特效 */
+        #startSystemBtn { background: #4f46e5; } /* 電光藍/靛藍 */
+        #startSystemBtn:focus, #startSystemBtn:active { background: #4338ca; box-shadow: 0 0 18px #6366f1; border-color: #fff; }
+
+        #prevPageBtn { background: #334155; } /* 深海藍灰 */
+        #prevPageBtn:focus, #prevPageBtn:active { background: #475569; box-shadow: 0 0 12px #64748b; border-color: #fff; }
+
+        #nextPageBtn { background: #d97706; } /* 暖陽金/琥珀色 */
+        #nextPageBtn:focus, #nextPageBtn:active { background: #b45309; box-shadow: 0 0 12px #f59e0b; border-color: #fff; }
 
         .map-section { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
         .visual-grid { 
@@ -285,7 +295,7 @@
     <h1 style="font-size: 30px; margin-bottom: 5px;">倉儲庫位控管系統</h1>
     <h2 style="color:var(--primary); font-size: 36px; margin: 0 0 10px 0;">V24.3</h2>
     <p style="color:var(--text-dim); margin-bottom: 30px; font-size: 16px;">行動端優化版</p>
-    <button class="btn-main" style="width: 220px; padding: 16px; font-size: 16px;" onclick="enterSystem()">啟動系統</button>
+    <button id="startSystemBtn" class="btn-main" style="width: 220px; padding: 16px; font-size: 16px;" onclick="enterSystem()">啟動系統</button>
 </div>
 
 <div id="itemModal" class="modal">
@@ -331,19 +341,19 @@
         </div>
         <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
             <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-右')">✖</span>
-            <div style="font-size:12px;">極冷右空位 <span id="arrow-極冷庫-右">▼</span></div>
+            <div style="font-size:12px;">極冷右空位 <span id="arrow-極冷庫-right">▼</span></div>
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="floor-detail"></div>
         </div>
         <div class="stat-card" id="card-冷藏庫-text-left" onclick="toggleCardDetail('冷藏庫-左')">
             <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-左')">✖</span>
-            <div style="font-size:12px;">冷藏左空位 <span id="arrow-冷藏庫-左">▼</span></div>
+            <div style="font-size:12px;">冷藏左空位 <span id="arrow-冷藏庫-left">▼</span></div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
             <div id="detail-冷藏庫-左" class="floor-detail"></div>
         </div>
         <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
             <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-右')">✖</span>
-            <div style="font-size:12px;">冷藏右空位 <span id="arrow-冷藏庫-右">▼</span></div>
+            <div style="font-size:12px;">冷藏右空位 <span id="arrow-冷藏庫-right">▼</span></div>
             <div id="empty-冷藏庫-右" class="stat-value">--</div>
             <div id="detail-冷藏庫-右" class="floor-detail"></div>
         </div>
@@ -376,7 +386,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <b style="font-size:15px;">📌 儲位可視化地圖</b>
             <div style="display:flex; gap:6px;">
-                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+                <select id="vZone" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-慢</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
                 <select id="vFloor" style="padding:6px 10px; margin:0; font-size:12px;" onchange="renderVisual()"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
         </div>
@@ -590,10 +600,11 @@
             </div>`;
         }).join('');
 
+        // 👑 修正重點：分頁生成部分套用對應的彩色按鈕 ID
         document.getElementById('pagination').innerHTML = `
-            <button class="btn-main" style="padding:8px 14px;" onclick="changeP(-1, ${totalPages})">上一頁</button> 
+            <button id="prevPageBtn" class="btn-main" style="padding:8px 14px;" onclick="changeP(-1, ${totalPages})">上一頁</button> 
             <span style="margin:0 10px; font-weight:bold;">${currentPage} / ${totalPages}</span> 
-            <button class="btn-main" style="padding:8px 14px;" onclick="changeP(1, ${totalPages})">下一頁</button>
+            <button id="nextPageBtn" class="btn-main" style="padding:8px 14px;" onclick="changeP(1, ${totalPages})">下一頁</button>
         `;
 
         bindSwipeEvents();
@@ -706,7 +717,6 @@
         if(cardEl) cardEl.style.display = 'none';
     }
 
-    /* 👑 預警切換：同步控制 active 類別以顯示霓虹外框 */
     function toggleWarningMode() { 
         isWarningMode = !isWarningMode; 
         const btn = document.getElementById('warningBtn');
@@ -721,7 +731,6 @@
         renderAll(); 
     }
     
-    /* 👑 標記切換：同步控制 active 類別以顯示霓虹外框 */
     function toggleMarkMode() { 
         isMarkMode = !isMarkMode; 
         const btn = document.getElementById('markBtn');
@@ -747,6 +756,7 @@
         } 
     }
     
+    // 開啟資料箱對話框
     function openBox(type, id) {
         const item = id ? inventory.find(x => x.id === id) : {zone:document.getElementById('vZone').value, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
         document.getElementById('itemModal').style.display = 'block';
@@ -799,7 +809,6 @@
         closeModal(); saveDataLocal();
     }
 
-    /* 👑 管理模式登入：同步控制 active 狀態及文字顯示 */
     function adminLogin() { 
         const btn = document.getElementById('adminLoginBtn');
         if (!isAdmin) { 
@@ -817,7 +826,6 @@
         renderTable(); 
     }
     
-    /* 👑 維護管理面板切換：控制面板按鈕 active 類別 */
     function toggleAdminPanel() { 
         const p = document.getElementById('admin-panel'); 
         const btn = document.getElementById('adminPanelBtn');
