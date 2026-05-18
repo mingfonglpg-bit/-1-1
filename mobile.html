@@ -378,7 +378,7 @@
         <div style="display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; gap:10px; width:100%;">
                 <button onclick="document.getElementById('xlsxFile').click()" class="btn-main" style="flex:1; background: #0ea5e9;">📂 匯入儲位 Excel</button>
-                <button onclick="fetchRemoteExcel()" class="btn-main" style="flex:1; background: #8b5cf6;">🌐 取得資料</button>
+                <button onclick="fetchRemoteExcel()" class="btn-main" style="flex:1; background: #8b5cf6;">🌐 雲端資料</button>
             </div>
             <button id="manualAddBtn" onclick="openBox('add')" class="btn-main" style="background:var(--primary); display:none; width:100%;">➕ 手動新增儲位</button>
         </div>
@@ -952,7 +952,9 @@
     }
 
     function exportExcel() { 
-        const ws = XLSX.utils.json_to_sheet(inventory); 
+        // 排除掉不想要的 "fullPos" 欄位，僅保留其餘需要的資料欄位
+        const cleanInventory = inventory.map(({ fullPos, ...rest }) => rest);
+        const ws = XLSX.utils.json_to_sheet(cleanInventory); 
         const wb = XLSX.utils.book_new(); 
         XLSX.utils.book_append_sheet(wb, ws, "Inventory"); 
         XLSX.writeFile(wb, "Inventory.xlsx"); 
