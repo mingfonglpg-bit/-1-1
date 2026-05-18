@@ -376,7 +376,10 @@
 
     <div id="admin-panel" style="display:none; margin-bottom:20px; background:rgba(255,255,255,0.04); padding:16px; border-radius:16px; border: 1px solid var(--border);">
         <div style="display:flex; flex-direction:column; gap:10px;">
-            <button onclick="document.getElementById('xlsxFile').click()" class="btn-main" style="width:100%; background: #0ea5e9;">📂 匯入儲位 Excel</button>
+            <div style="display:flex; gap:10px; width:100%;">
+                <button onclick="document.getElementById('xlsxFile').click()" class="btn-main" style="flex:1; background: #0ea5e9;">📂 匯入儲位 Excel</button>
+                <button onclick="fetchRemoteExcel()" class="btn-main" style="flex:1; background: #8b5cf6;">🌐 取得資料</button>
+            </div>
             <button id="manualAddBtn" onclick="openBox('add')" class="btn-main" style="background:var(--primary); display:none; width:100%;">➕ 手動新增儲位</button>
         </div>
         <input type="file" id="xlsxFile" style="display:none;" onchange="handleFile(this)">
@@ -900,27 +903,52 @@
         const reader = new FileReader(); 
         reader.onload = (e) => { 
             const data = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type:'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type:'array'}).SheetNames[0]], {header:1}); 
-            inventory = data.slice(1).map((r, i) => {
-                let rawZone = String(r[1]||"").trim();
-                if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
-                if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
-                return { 
-                    id: Date.now() + i, 
-                    zone: rawZone, 
-                    floor: String(r[2]||"").trim(), 
-                    pos: String(r[3]||"").trim(), 
-                    fullPos: `${rawZone}${r[2]}-${r[3]}`, 
-                    name: String(r[4]||""), 
-                    batch: String(r[5]||""), 
-                    date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", 
-                    note: String(r[7]||"") 
-                };
-            }).filter(x => x.zone); 
-            swipedCardIds.clear(); 
-            logAction("系統匯入", `匯入全庫資料共 ${inventory.length} 筆。`);
-            saveDataLocal(); 
+            processExcelData(data);
         }; 
         reader.readAsArrayBuffer(input.files[0]); 
+    }
+
+    // 🌐 新增：遠端發送 Fetch 取得擴充凍庫 XLSX 資料
+    async function fetchRemoteExcel() {
+        const url = 'https://mingfonglpg-bit.github.io/-1-1/擴充凍庫.xlsx';
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('網路回應不成功');
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(new Uint8Array(arrayBuffer), {type: 'array'});
+            const firstSheetName = workbook.SheetNames[0];
+            const data = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {header: 1});
+            
+            processExcelData(data);
+            logAction("系統遠端匯入", `成功從網路端下載並匯入擴充凍庫資料。`);
+            alert("遠端擴充凍庫資料取得並匯入成功！");
+        } catch (error) {
+            console.error('Fetch 錯誤:', error);
+            alert("無法取得遠端資料，請檢查網路連線或 CORS 設定。");
+        }
+    }
+
+    // 統一處理解析後的 Excel 陣列資料
+    function processExcelData(data) {
+        inventory = data.slice(1).map((r, i) => {
+            let rawZone = String(r[1]||"").trim();
+            if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
+            if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
+            return { 
+                id: Date.now() + i, 
+                zone: rawZone, 
+                floor: String(r[2]||"").trim(), 
+                pos: String(r[3]||"").trim(), 
+                fullPos: `${rawZone}${r[2]}-${r[3]}`, 
+                name: String(r[4]||""), 
+                batch: String(r[5]||""), 
+                date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", 
+                note: String(r[7]||"") 
+            };
+        }).filter(x => x.zone); 
+        swipedCardIds.clear(); 
+        logAction("系統匯入", `匯入全庫資料共 ${inventory.length} 筆。`);
+        saveDataLocal(); 
     }
 
     function exportExcel() { 
