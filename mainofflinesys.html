@@ -122,9 +122,9 @@
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="floor-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-left')">
+        <div class="stat-card" id="card-冷藏庫-left" onclick="toggleCardDetail('冷藏庫-左')">
             <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-左')">✖</span>
-            <div>冷藏左空位 <span id="arrow-冷藏庫-慢">▼</span></div>
+            <div>冷藏左空位 <span id="arrow-冷藏庫-左">▼</span></div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
             <div id="detail-冷藏庫-左" class="floor-detail"></div>
         </div>
@@ -153,13 +153,14 @@
 
     <div id="admin-panel" style="display:none; margin-bottom:15px; background:rgba(255,255,255,0.05); padding:15px; border-radius:15px;">
         <button onclick="document.getElementById('xlsxFile').click()" class="btn-main">📂 匯入 Excel</button>
+        <button id="cloudSyncBtn" onclick="importFromCloud()" class="btn-main" style="background:var(--restock)">🌐 雲端同步</button>
         <button id="manualAddBtn" onclick="openBox('add')" class="btn-main" style="background:var(--primary); display:none;">➕ 手動新增儲位</button>
         <input type="file" id="xlsxFile" style="display:none;" onchange="handleFile(this)">
     </div>
 
     <section class="map-section">
         <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-            <b>區域地圖</b>
+            <b>儲位地圖</b>
             <div>
                 <select id="vZone" onchange="renderVisual()"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
                 <select id="vFloor" onchange="renderVisual()"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
@@ -284,7 +285,6 @@
         if (currentSort.key) filtered.sort((a,b) => (a[currentSort.key]||"").localeCompare(b[currentSort.key]||"", undefined, {numeric:true}) * currentSort.order);
         
         const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
-        // 房呆機制：避免超出最大頁數
         if (currentPage > totalPages) currentPage = totalPages;
         
         const data = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -319,7 +319,7 @@
         const rows = document.querySelectorAll('#tableBody tr');
         rows.forEach(row => {
             row.addEventListener('mousedown', function(e) {
-                if (!isMarkMode && !isWarningMode) return; 
+                if (!isWarningMode && !isMarkMode) return; 
                 if (e.target.closest('.action-btn')) return;
                 isDraggingRow = true;
                 hasMovedRow = false;
@@ -328,7 +328,7 @@
             });
 
             row.addEventListener('click', function(e) {
-                if (!isMarkMode && !isWarningMode) return;
+                if (!isWarningMode && !isMarkMode) return;
                 if (e.target.closest('.action-btn')) return;
                 if (hasMovedRow) return;
 
@@ -506,8 +506,8 @@
     function adminLogin() { if (!isAdmin) { const pw = prompt("密碼:"); if (pw === "admin123") isAdmin = true; else return; } else isAdmin = false; document.getElementById('adminLoginBtn').innerText = isAdmin ? "🔓 管理中" : "🔐 管理模式"; document.getElementById('manualAddBtn').style.display = isAdmin ? 'inline-block' : 'none'; renderTable(); }
     
     function updateStats() {
-        const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-左", "冷藏庫-右", "常溫區"];
-        zones.forEach(z => {
+        const targetZones = ["極冷庫-左", "極冷庫-右", "冷藏庫-左", "冷藏庫-右", "常溫區"];
+        targetZones.forEach(z => {
             const cardEl = document.getElementById(`card-${z}`);
             if (hiddenCards.has(z)) { if (cardEl) cardEl.style.display = 'none'; return; } else { if (cardEl) cardEl.style.display = 'block'; }
             let totalOcc = 0; let floorDetails = [];
@@ -547,15 +547,61 @@
         const reader = new FileReader(); 
         reader.onload = (e) => { 
             const data = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type:'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type:'array'}).SheetNames[0]], {header:1}); 
-            inventory = data.slice(1).map((r, i) => ({ id: Date.now() + i, zone: String(r[1]||"").trim(), floor: String(r[2]||"").trim(), pos: String(r[3]||"").trim(), fullPos: `${r[1]}${r[2]}-${r[3]}`, name: String(r[4]||""), batch: String(r[5]||""), date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", note: String(r[7]||"") })).filter(x => x.zone); 
-            logAction("系統匯入", `自外部 Excel 覆蓋導回全庫數據，共載入 ${inventory.length} 筆儲位紀錄。`);
-            saveDataLocal(); 
+            processExcelData(data, "自外部 Excel 覆蓋導回全庫數據");
         }; 
         reader.readAsArrayBuffer(input.files[0]); 
     }
 
+    function processExcelData(data, logMsg) {
+        inventory = data.slice(1).map((r, i) => ({ 
+            id: Date.now() + i, 
+            zone: String(r[1]||"").trim(), 
+            floor: String(r[2]||"").trim(), 
+            pos: String(r[3]||"").trim(), 
+            fullPos: `${r[1]}${r[2]}-${r[3]}`, 
+            name: String(r[4]||""), 
+            batch: String(r[5]||""), 
+            date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", 
+            note: String(r[7]||"") 
+        })).filter(x => x.zone); 
+        logAction("系統匯入", `${logMsg}，共載入 ${inventory.length} 筆儲位紀錄。`);
+        saveDataLocal();
+    }
+
+    async function importFromCloud() {
+        const btn = document.getElementById('cloudSyncBtn');
+        const url = "https://mingfonglpg-bit.github.io/-1-1/擴充凍庫.xlsx";
+        const originText = btn.innerText;
+        
+        try {
+            btn.innerText = "⏳ 同步中...";
+            btn.disabled = true;
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+            
+            const arrayBuffer = await response.arrayBuffer();
+            const data = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(arrayBuffer), {type:'array'}).Sheets[XLSX.read(new Uint8Array(arrayBuffer), {type:'array'}).SheetNames[0]], {header:1});
+            
+            processExcelData(data, "自 GitHub 雲端網址同步覆蓋庫存數據");
+            alert("雲端同步成功！已更新全庫儲位紀錄。");
+        } catch (error) {
+            console.error(error);
+            alert("雲端同步失敗，請檢查網路連線或 CORS 限制。\n錯誤訊息: " + error.message);
+        } finally {
+            btn.innerText = originText;
+            btn.disabled = false;
+        }
+    }
+
+    /* 重點修改：此處將 inventory 進行對應轉換，並將 fullPos 屬性剃除後再進行匯出 */
     function exportExcel() { 
-        const ws = XLSX.utils.json_to_sheet(inventory); 
+        const cleanData = inventory.map(item => {
+            // 使用解構賦值，將 fullPos 抽出不放入其餘物件 (rest) 中
+            const { fullPos, ...rest } = item;
+            return rest;
+        });
+        const ws = XLSX.utils.json_to_sheet(cleanData); 
         const wb = XLSX.utils.book_new(); 
         XLSX.utils.book_append_sheet(wb, ws, "Inventory"); 
         XLSX.writeFile(wb, "Inventory.xlsx"); 
