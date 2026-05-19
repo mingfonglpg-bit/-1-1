@@ -290,12 +290,18 @@
     </style>
 </head>
 <body>
-
 <div id="welcome-page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
     <h1 style="font-size: 30px; margin-bottom: 5px;">倉儲庫位控管系統</h1>
     <h2 style="color:var(--primary); font-size: 36px; margin: 0 0 10px 0;">V24.3</h2>
     <p style="color:var(--text-dim); margin-bottom: 30px; font-size: 16px;">行動端優化版</p>
+    
+    <!-- 第一個按鈕：啟動系統 (如果你也想把第一個按鈕修圓，可以自行在 style 加上 border-radius: 25px;) -->
     <button id="startSystemBtn" class="btn-main" style="width: 220px; padding: 16px; font-size: 16px;" onclick="enterSystem()">啟動系統</button>
+    
+<!-- 第二個按鈕：科技藍漸層 + 微發光字體 -->
+<button id="redirectBtn" style="width: 220px; padding: 16px; font-size: 16px; font-weight: bold; letter-spacing: 2px; margin-top: 15px; background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); text-shadow: 0 0 4px rgba(255,255,255,0.6);" onclick="window.location.href='mobile2.html'">
+    連線版
+</button>
 </div>
 
 <div id="itemModal" class="modal">
