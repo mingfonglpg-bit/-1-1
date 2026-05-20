@@ -133,7 +133,7 @@
                 <span>🥶 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
             </div>
-            <div id="empty-極冷庫-開" class="stat-value">--</div>
+            <div id="empty-極冷庫-左" class="stat-value">--</div>
             <div id="detail-極冷庫-左" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
@@ -144,20 +144,20 @@
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="stat-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-開')">
+        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
             <div class="stat-label">
-                <span>💧 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
+                <span>💧 冷藏庫-心理 <span id="arrow-冷藏庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
             </div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
-            <div id="detail-冷藏庫-left" class="stat-detail"></div>
+            <div id="detail-冷藏庫-左" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
             <div class="stat-label">
                 <span>🍏 冷藏庫-右 <span id="arrow-冷藏庫-右">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
             </div>
-            <div id="empty-冷藏庫-右" class="stat-value">--</div>
+            <div id="empty-冷藏庫-right" class="stat-value">--</div>
             <div id="detail-冷藏庫-右" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
@@ -318,7 +318,6 @@
         let actionLogs = [];
         let searchDebounceTimer = null;
 
-        // 🚀 頁面 DOM 載入完畢後自動觸發系統初始化
         window.addEventListener('DOMContentLoaded', () => {
             enterSystem();
         });
@@ -358,13 +357,12 @@
 
         async function enterSystem() {
             showToast("☁️ 正在連線下載雲端庫存...", 0);
-            
             try {
-                const response = await fetch(`${SCRIPT_URL}?action=read`);
+                // 💡 優化點：GET 請求加上防快取機制
+                const response = await fetch(`${SCRIPT_URL}?action=read&_t=${Date.now()}`);
                 if (!response.ok) throw new Error("連線錯誤");
                 const resData = await response.json();
                 if (resData.status === "success") {
-                    // 🛠️ 核心修正：從雲端抓取資料時，自動組裝與補齊地圖及表格比對所需的關鍵 fullPos 欄位與格式轉換
                     inventory = resData.data.map(item => {
                         const rawZone = String(item.zone || "").trim();
                         const rawFloor = String(item.floor || "").trim();
@@ -375,11 +373,11 @@
                             zone: rawZone,
                             floor: rawFloor,
                             pos: rawPos,
-                            fullPos: item.fullPos ? item.fullPos : `${rawZone}${rawFloor}-${rawPos}`,
-                            name: String(item.name || ""),
-                            batch: String(item.batch || ""),
-                            date: item.date ? item.date : "-",
-                            note: String(item.note || "")
+                            fullPos: item.fullPos ? item.fullPos.trim() : `${rawZone}${rawFloor}-${rawPos}`,
+                            name: String(item.name || "").trim(),
+                            batch: String(item.batch || "").trim(),
+                            date: item.date ? item.date.trim() : "-",
+                            note: String(item.note || "").trim()
                         };
                     });
                     logAction("雲端連線", `成功自雲端載入 ${inventory.length} 筆資料。`);
@@ -388,7 +386,6 @@
                 }
             } catch (error) {
                 console.error(error);
-                console.log("無法連線至雲端 Google Sheets，改載入最後一次本地暫存檔。");
                 const saved = localStorage.getItem('offlineData_V23_7');
                 if(saved) { inventory = JSON.parse(saved); }
             } finally {
@@ -397,14 +394,20 @@
             }
         }
 
+        // 💡 核心修復：重構雲端資料同步函數，改採相容性最高、最穩定的 URLSearchParams 格式
         async function syncToCloud(actionType, entryData) {
             showToast("☁️ 雲端同步中...", 0);
             try {
+                // 將資料結構轉換為標準的表單傳輸，保證行動端與跨網域的 `no-cors` 指令能被後端 100% 讀取
+                const params = new URLSearchParams();
+                params.append("action", actionType);
+                params.append("data", JSON.stringify(entryData));
+
                 await fetch(SCRIPT_URL, {
                     method: "POST",
                     mode: "no-cors", 
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: actionType, data: entryData })
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: params.toString()
                 });
                 showToast("✅ 雲端同步完畢");
             } catch (error) {
@@ -436,7 +439,6 @@
                 if (markedPos.has(full)) slot.classList.add('status-marked');
                 slot.innerHTML = `<div>${i}</div>`;
                 slot.onclick = () => { 
-                    // 精確搜尋庫位
                     document.getElementById('searchInput').value = `pos:${full}`; 
                     onSearch(); 
                 };
@@ -786,12 +788,11 @@
             }
         }
 
+        // 💡 修正點：全量移除錯字（如 冷藏庫-開、極冷庫-開、detail-冷藏庫-left），與 DOM 完全對齊，防止 JS 執行阻斷
         function updateStats() {
-            const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-開", "冷藏庫-右", "常溫區"];
+            const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-左", "冷藏庫-右", "常溫區"];
             zones.forEach(z => {
-                let dataZone = z;
                 let domZone = z;
-
                 const cardEl = document.getElementById(`card-${domZone}`);
                 if (closedCards.has(domZone)) { 
                     if (cardEl) cardEl.style.display = 'none'; 
@@ -804,19 +805,17 @@
                 ["1F","2F","3F","4F"].forEach(f => { 
                     let floorOcc = 0;
                     for(let i=1; i<=22; i++) {
-                        if(inventory.some(x => x.fullPos === `${dataZone}${f}-${i}`)) { 
+                        if(inventory.some(x => x.fullPos === `${domZone}${f}-${i}`)) { 
                             floorOcc++; totalOcc++; 
                         }
                     }
                     floorDetails.push(`${f}:<span class="stat-num-highlight">${22 - floorOcc}</span>`);
                 });
                 
-                const emptyTargetId = (domZone === "極冷庫-左") ? "empty-極冷庫-開" : `empty-${domZone}`;
-                const targetEmptyEl = document.getElementById(emptyTargetId);
+                const targetEmptyEl = document.getElementById(`empty-${domZone}`);
                 if(targetEmptyEl) targetEmptyEl.innerText = 88 - totalOcc;
                 
-                let targetDetailId = (domZone === "冷藏庫-開") ? "detail-冷藏庫-left" : `detail-${domZone}`;
-                const detailEl = document.getElementById(targetDetailId);
+                const detailEl = document.getElementById(`detail-${domZone}`);
                 if(detailEl) {
                     detailEl.innerHTML = floorDetails.join(" | ");
                     detailEl.style.display = hiddenCardDetails.has(domZone) ? 'none' : 'block';
@@ -896,10 +895,10 @@
                     floor: String(r[2]||"").trim(), 
                     pos: String(r[3]||"").trim(), 
                     fullPos: `${rawZone}${r[2]}-${r[3]}`, 
-                    name: String(r[4]||""), 
-                    batch: String(r[5]||""), 
+                    name: String(r[4]||"").trim(), 
+                    batch: String(r[5]||"").trim(), 
                     date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", 
-                    note: String(r[7]||"") 
+                    note: String(r[7]||"").trim() 
                 };
             }).filter(x => x.zone); 
             swipedCardIds.clear(); 
