@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⚡ 倉儲庫位控管系統 V24.3 視覺同步行動連線版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { 
+            --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981; --marked: #a855f7;
+            --task-color: #d9f99d; --restock: #06b6d4;
+            --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
+            --color-cold: #3b82f6; --color-chill: #0ea5e9; --color-ambient: #94a3b8;
+            --stat-num: #fbbf24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); padding: 12px; font-size: 14px; padding-bottom: 60px; overflow-x: hidden; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); backdrop-filter: blur(8px); }
+        .header h1 { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
+        
+        .btn-main { background: var(--primary); color: #fff; border: none; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; }
+        .btn-main:active { transform: scale(0.95); opacity: 0.9; }
+        .btn-main.active { background: #4f46e5; box-shadow: 0 0 12px rgba(99, 102, 241, 0.5); }
+        
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .stat-card { background: var(--card-bg); border-radius: 12px; padding: 10px 12px; border: 1px solid var(--border); position: relative; cursor: pointer; transition: transform 0.2s; }
+        .stat-card:active { transform: scale(0.98); }
+        .stat-label { font-size: 12px; color: var(--text-dim); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+        .stat-value { font-size: 22px; font-weight: 800; color: var(--stat-num); margin-top: 2px; }
+        .stat-detail { font-size: 11px; color: var(--text-dim); margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px; display: none; word-break: break-all; }
+        .stat-num-highlight { color: #fff; font-weight: bold; }
+        .close-card-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+        .close-card-btn:hover { color: var(--danger); }
+        
+        .nav-control { display: flex; gap: 6px; margin-bottom: 12px; background: var(--card-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; white-space: nowrap; }
+        .nav-control select { background: #334155; color: #fff; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; outline: none; }
+        
+        .visual-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; }
+        .slot { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; height: 48px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: 700; color: var(--text-dim); position: relative; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+        .slot div { font-size: 15px; }
+        .slot.occupied { background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #fff; }
+        .slot.occupied::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; }
+        .slot.has-note::after { background: #22d3ee !important; width: 7px; height: 7px; }
+        .slot.status-warning { background: rgba(245, 158, 11, 0.2) !important; border-color: var(--warning) !important; color: var(--warning) !important; }
+        .slot.status-danger { background: rgba(239, 68, 68, 0.25) !important; border-color: var(--danger) !important; color: var(--danger) !important; }
+        .slot.status-task { background: rgba(217, 249, 157, 0.25) !important; border-color: #a3e635 !important; color: #d9f99d !important; }
+        .slot.status-marked { background: rgba(168, 85, 247, 0.3) !important; border-color: var(--marked) !important; color: #e9d5ff !important; box-shadow: inset 0 0 6px rgba(168, 85, 247, 0.5); }
+        .slot:active { transform: scale(0.92); background: rgba(255,255,255,0.1); }
+        
+        .focus-warning .slot:not(.status-warning) { opacity: 0.3; }
+        .focus-marked .slot:not(.status-marked) { opacity: 0.3; }
+        
+        .search-box { display: flex; gap: 6px; margin-bottom: 12px; position: relative; }
+        .search-box input { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 14px; outline: none; backdrop-filter: blur(8px); }
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 8px rgba(99,102,241,0.3); }
+        
+        .view-container { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 8px; margin-bottom: 12px; overflow: hidden; }
+        
+        .table-view { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; display: none; }
+        @media(min-width: 641px) { .table-view { display: table; } .card-view { display: none !important; } }
+        .table-view th, .table-view td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+        .table-view th { color: var(--text-dim); font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); }
+        .table-view th:hover { color: #fff; }
+        .table-view tbody tr { transition: background 0.15s; }
+        .table-view tbody tr:active { background: rgba(255,255,255,0.05); }
+        .table-view tr.row-selected { background: rgba(168, 85, 247, 0.15) !important; border-left: 3px solid var(--marked); }
+        
+        .card-view { display: flex; flex-direction: column; gap: 8px; }
+        .info-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: transform 0.2s, opacity 0.2s; will-change: transform, opacity; overflow: hidden; }
+        .info-card.card-selected { border-color: var(--marked); background: rgba(168, 85, 247, 0.08); box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
+        .info-card.swiped-out { transform: translateX(100%) !important; opacity: 0 !important; }
+        .info-card.swiped-out-left { transform: translateX(-100%) !important; opacity: 0 !important; }
+        
+        .in-mark-mode .info-card:not(.card-selected), .in-mark-mode .table-view tbody tr:not(.row-selected) { opacity: 0.45; }
+        
+        .pos-badge { padding: 3px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #fff; display: inline-block; }
+        .bg-cold { background: var(--color-cold); }
+        .bg-chill { background: var(--color-chill); }
+        .bg-ambient { background: var(--color-ambient); color: #0f172a; }
+        
+        .action-btn { border: none; padding: 5px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; color: #fff; cursor: pointer; margin-left: 4px; transition: opacity 0.15s; }
+        .action-btn:active { opacity: 0.7; }
+        
+        .scrapped-text { text-decoration: line-through; opacity: 0.5; color: #94a3b8 !important; }
+        
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 4px; border-top: 1px solid var(--border); }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.8); z-index: 1000; backdrop-filter: blur(6px); animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { background: #1e293b; border: 1px solid var(--border); width: 90%; max-width: 400px; margin: 15% auto; border-radius: 16px; padding: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); transform: translateY(0); transition: transform 0.3s; }
+        .modal-header { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .modal-body { display: flex; flex-direction: column; gap: 10px; max-height: 65vh; overflow-y: auto; padding-right: 4px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+        .form-group input, .form-group select { background: #0f172a; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px; color: #fff; font-size: 14px; outline: none; }
+        .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+        
+        .admin-panel { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 12px; margin-bottom: 12px; display: none; }
+        .admin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        
+        .cloud-status-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); border: 1px solid var(--primary); color: #fff; padding: 10px 18px; border-radius: 30px; font-size: 13px; font-weight: 600; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); z-index: 2000; pointer-events: none; display: none; text-align: center; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>⚡ 倉儲庫位控管系統</h1>
+        <div style="display:flex; gap:6px;">
+            <button id="adminLoginBtn" class="btn-main" style="background:#334155" onclick="adminLogin()">🔐 管理模式</button>
+            <button id="adminPanelBtn" class="btn-main" style="background:#475569;" onclick="toggleAdminPanel()">⚙️ 工具</button>
+        </div>
+    </div>
+
+    <div id="admin-panel" class="admin-panel">
+        <div class="admin-grid">
+            <button class="btn-main" style="background:#0284c7" onclick="fetchRemoteExcel()">🌐 載入遠端擴充檔</button>
+            <button class="btn-main" style="background:#16a34a" onclick="exportExcel()">📤 匯出庫存表</button>
+            <button class="btn-main" style="background:#7c3aed" onclick="exportActionLogs()">📊 匯出系統日誌</button>
+            <button id="manualAddBtn" class="btn-main" style="background:var(--primary); display:none;" onclick="openBox('add')">➕ 手動新增儲位</button>
+            <div class="btn-main" style="background:#4f46e5; position:relative; overflow:hidden; justify-content:center;">
+                📁 本地 Excel 匯入
+                <input type="file" accept=".xlsx, .xls" onchange="handleFile(this)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
+            <div class="stat-label">
+                <span>🥶 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
+            </div>
+            <div id="empty-極冷庫-開" class="stat-value">--</div>
+            <div id="detail-極冷庫-左" class="stat-detail"></div>
+        </div>
+        <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
+            <div class="stat-label">
+                <span>❄️ 極冷庫-右 <span id="arrow-極冷庫-右">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-右')">×</button>
+            </div>
+            <div id="empty-極冷庫-右" class="stat-value">--</div>
+            <div id="detail-極冷庫-右" class="stat-detail"></div>
+        </div>
+        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-開')">
+            <div class="stat-label">
+                <span>💧 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
+            </div>
+            <div id="empty-冷藏庫-左" class="stat-value">--</div>
+            <div id="detail-冷藏庫-left" class="stat-detail"></div>
+        </div>
+        <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
+            <div class="stat-label">
+                <span>🍏 冷藏庫-右 <span id="arrow-冷藏庫-右">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
+            </div>
+            <div id="empty-冷藏庫-右" class="stat-value">--</div>
+            <div id="detail-冷藏庫-右" class="stat-detail"></div>
+        </div>
+        <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
+            <div class="stat-label">
+                <span>📦 常溫區 <span id="arrow-常溫區">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '常溫區')">×</button>
+            </div>
+            <div id="empty-常溫區" class="stat-value">--</div>
+            <div id="detail-常溫區" class="stat-detail"></div>
+        </div>
+    </div>
+
+    <div class="nav-control">
+        <select id="vZone" onchange="renderAll()">
+            <option value="極冷庫-左">🥶 極冷庫-左</option>
+            <option value="極冷庫-右">❄️ 極冷庫-右</option>
+            <option value="冷藏庫-左">💧 冷藏庫-左</option>
+            <option value="冷藏庫-右">🍏 冷藏庫-右</option>
+            <option value="常溫區">📦 常溫區</option>
+        </select>
+        <select id="vFloor" onchange="renderAll()">
+            <option value="1F">1 樓層</option>
+            <option value="2F">2 樓層</option>
+            <option value="3F">3 樓層</option>
+            <option value="4F">4 樓層</option>
+        </select>
+        <button id="warningBtn" class="btn-main" style="background:var(--warning)" onclick="toggleWarningMode()">⚠️ 效期急件</button>
+        <button id="markBtn" class="btn-main" style="background:var(--marked)" onclick="toggleMarkMode()">🔮 標記篩選</button>
+    </div>
+
+    <div class="visual-grid" id="visualGrid"></div>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="🔍 輸入關鍵字自動搜尋品項/批號/備註..." oninput="onSearch()">
+        <button class="btn-main" style="background:#475569" onclick="clearSearch()">重置</button>
+        
+        <select id="cardSortSelect" onchange="handleCardSelectSort(this.value)" style="background:#334155; color:#fff; border:1px solid var(--border); padding:0 8px; border-radius:10px; font-size:12px; outline:none; margin-left:2px;">
+            <option value="default">默认排序</option>
+            <option value="batch-asc">批号 ↗</option>
+            <option value="batch-desc">批号 ↘</option>
+            <option value="date-asc">效期 ↗</option>
+            <option value="date-desc">效期 ↘</option>
+        </select>
+    </div>
+
+    <div class="view-container" id="tableViewContainer">
+        <table class="table-view">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('fullPos')">儲位</th>
+                    <th onclick="sortTable('name')">品名規格</th>
+                    <th onclick="sortTable('batch')">生產批號</th>
+                    <th onclick="sortTable('date')">有效日期</th>
+                    <th onclick="sortTable('note')">備註說明</th>
+                    <th>操作行為</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="view-container" id="cardViewContainer" style="background:none; border:none; padding:0;">
+        <div class="card-view" id="cardListBody"></div>
+    </div>
+
+    <div class="pagination-container" id="pagination"></div>
+
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modalTitle">編輯儲位資料</span>
+                <span style="cursor:pointer; font-size:20px;" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px;">
+                    <div class="form-group">
+                        <label>區域</label>
+                        <select id="mZone">
+                            <option value="極冷庫-左">極冷庫-左</option>
+                            <option value="極冷庫-右">極冷庫-右</option>
+                            <option value="冷藏庫-左">冷藏庫-左</option>
+                            <option value="冷藏庫-右">冷藏庫-右</option>
+                            <option value="常溫區">常溫區</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>樓層</label>
+                        <select id="mFloor">
+                            <option value="1F">1F</option>
+                            <option value="2F">2F</option>
+                            <option value="3F">3F</option>
+                            <option value="4F">4F</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>庫位編號</label>
+                        <input type="text" id="mPos" placeholder="例: 1">
+                    </div>
+                </div>
+                
+                <div id="editFields">
+                    <div class="form-group" style="margin-top:8px;">
+                        <label>貨品名稱</label>
+                        <input type="text" id="mName" placeholder="請輸入產品名稱規格">
+                    </div>
+                    <div class="form-group" style="margin-top:8px;">
+                        <label>生產批號 / 序號</label>
+                        <input type="text" id="mBatch" placeholder="請輸入批號">
+                    </div>
+                    <div class="form-group" style="margin-top:8px;">
+                        <label>有效日期期限</label>
+                        <input type="date" id="mDate">
+                    </div>
+                </div>
+
+                <div id="reportFields" style="display:none; margin-top:8px;">
+                    <div class="form-group">
+                        <label>狀態類別變更</label>
+                        <select id="mStatusType">
+                            <option value="">-- 請選擇判定狀態 --</option>
+                            <option value="盤點中">🔍 現場盤點中</option>
+                            <option value="貨品異常">⚠️ 貨品品質異常</option>
+                            <option value="位置移位">🔄 儲位異動移位</option>
+                            <option value="即期出清">⚡ 即期降價出清</option>
+                            <option value="申請報廢">❌ 申請報廢除帳</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:8px;">
+                    <label>備註特別說明</label>
+                    <input type="text" id="mNote" placeholder="輸入其它現場提示備註">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-main" style="background:#475569" onclick="closeModal()">取消</button>
+                <button class="btn-main" style="background:var(--edit)" onclick="saveData()">儲存更新</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cloud-status-toast" class="cloud-status-toast">☁️ 正在連線下載雲端庫存...</div>
+
+    <script>
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec";
+
+        let inventory = [];
+        let isWarningMode = false, isMarkMode = false, isAdmin = false;
+        let markedPos = new Set();
+        let currentSort = { key: '', order: 1 };
+        let currentPage = 1, rowsPerPage = 10;
+        
+        let hiddenCardDetails = new Set();
+        let closedCards = new Set(); 
+        
+        let swipedCardIds = new Set(); 
+        let actionLogs = [];
+        let searchDebounceTimer = null;
+
+        // 🚀 頁面 DOM 載入完畢後自動觸發系統初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            enterSystem();
+        });
+
+        function showToast(text, duration = 2000) {
+            const toast = document.getElementById('cloud-status-toast');
+            toast.innerText = text;
+            toast.style.display = 'block';
+            if (duration > 0) {
+                setTimeout(() => { toast.style.display = 'none'; }, duration);
+            }
+        }
+        function hideToast() { document.getElementById('cloud-status-toast').style.display = 'none'; }
+
+        function logAction(actionType, detail) {
+            const now = new Date();
+            const timestamp = now.getFullYear() + '/' + 
+                            (now.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                            now.getDate().toString().padStart(2, '0') + ' ' + 
+                            now.getHours().toString().padStart(2, '0') + ':' + 
+                            now.getMinutes().toString().padStart(2, '0') + ':' + 
+                            now.getSeconds().toString().padStart(2, '0');
+            actionLogs.push({ "操作時間": timestamp, "行為類別": actionType, "詳細操作內容": detail });
+        }
+
+        function checkDateStatus(item) {
+            const note = (item.note || "").trim();
+            const name = (item.name || "").trim();
+            const d = item.date;
+            const diff = d && d !== "-" ? Math.ceil((new Date(d) - new Date().setHours(0,0,0,0)) / 86400000) : 999;
+            if (note.includes("報廢") || name.includes("報廢")) return 3; 
+            if (d !== "-" && diff < 0) return 2; 
+            if (note.match(/異常|移位|出清|盤點|查貨/)) return 4; 
+            if (d !== "-" && diff <= 14) return 1; 
+            return 0;
+        }
+
+        async function enterSystem() {
+            showToast("☁️ 正在連線下載雲端庫存...", 0);
+            
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=read`);
+                if (!response.ok) throw new Error("連線錯誤");
+                const resData = await response.json();
+                if (resData.status === "success") {
+                    // 🛠️ 核心修正：從雲端抓取資料時，自動組裝與補齊地圖及表格比對所需的關鍵 fullPos 欄位與格式轉換
+                    inventory = resData.data.map(item => {
+                        const rawZone = String(item.zone || "").trim();
+                        const rawFloor = String(item.floor || "").trim();
+                        const rawPos = String(item.pos || "").trim();
+                        return {
+                            ...item,
+                            id: parseInt(item.id) || Date.now(),
+                            zone: rawZone,
+                            floor: rawFloor,
+                            pos: rawPos,
+                            fullPos: item.fullPos ? item.fullPos : `${rawZone}${rawFloor}-${rawPos}`,
+                            name: String(item.name || ""),
+                            batch: String(item.batch || ""),
+                            date: item.date ? item.date : "-",
+                            note: String(item.note || "")
+                        };
+                    });
+                    logAction("雲端連線", `成功自雲端載入 ${inventory.length} 筆資料。`);
+                } else {
+                    throw new Error("讀取失敗");
+                }
+            } catch (error) {
+                console.error(error);
+                console.log("無法連線至雲端 Google Sheets，改載入最後一次本地暫存檔。");
+                const saved = localStorage.getItem('offlineData_V23_7');
+                if(saved) { inventory = JSON.parse(saved); }
+            } finally {
+                hideToast();
+                renderAll();
+            }
+        }
+
+        async function syncToCloud(actionType, entryData) {
+            showToast("☁️ 雲端同步中...", 0);
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors", 
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: actionType, data: entryData })
+                });
+                showToast("✅ 雲端同步完畢");
+            } catch (error) {
+                console.error("同步失敗:", error);
+                showToast("❌ 雲端同步失敗，已記錄於本地");
+            }
+        }
+
+        function renderVisual() {
+            const z = document.getElementById('vZone').value, f = document.getElementById('vFloor').value;
+            const grid = document.getElementById('visualGrid'); 
+            grid.innerHTML = '';
+            grid.className = 'visual-grid' + (isWarningMode ? ' focus-warning' : '') + (isMarkMode ? ' focus-marked' : '');
+            
+            for (let i = 1; i <= 22; i++) {
+                const full = `${z}${f}-${i}`;
+                const items = inventory.filter(x => x.fullPos === full);
+                const slot = document.createElement('div');
+                slot.className = 'slot'; 
+                
+                if (items.length > 0) {
+                    slot.classList.add('occupied');
+                    const s = items.map(x => checkDateStatus(x));
+                    if (s.includes(3) || s.includes(2)) slot.classList.add('status-danger');
+                    else if (s.includes(4)) slot.classList.add('status-task');
+                    else if (s.includes(1)) slot.classList.add('status-warning');
+                    if (items.some(x => (x.note && x.note.trim() !== ""))) slot.classList.add('has-note');
+                }
+                if (markedPos.has(full)) slot.classList.add('status-marked');
+                slot.innerHTML = `<div>${i}</div>`;
+                slot.onclick = () => { 
+                    // 精確搜尋庫位
+                    document.getElementById('searchInput').value = `pos:${full}`; 
+                    onSearch(); 
+                };
+                grid.appendChild(slot);
+            }
+            updateStats();
+        }
+
+        function handleItemRowClick(event, fullPos) {
+            if (!isMarkMode || event.target.classList.contains('action-btn')) return;
+            if (markedPos.has(fullPos)) { markedPos.delete(fullPos); } else { markedPos.add(fullPos); }
+            renderVisual();
+            renderTable();
+        }
+
+        function renderTable() {
+            const kw = document.getElementById('searchInput').value.toLowerCase().trim();
+            let filtered;
+            
+            if (isWarningMode) {
+                filtered = inventory.filter(x => checkDateStatus(x) === 1);
+            } else if (isMarkMode && markedPos.size > 0 && kw === '') {
+                filtered = inventory.filter(x => markedPos.has(x.fullPos));
+            } else if (kw.startsWith("pos:")) {
+                const targetPos = kw.replace("pos:", "");
+                filtered = inventory.filter(x => x.fullPos.toLowerCase() === targetPos);
+            } else if (kw) {
+                filtered = inventory.filter(x => (x.fullPos + x.name + x.batch + (x.note || "")).toLowerCase().includes(kw));
+            } else {
+                const cz = document.getElementById('vZone').value, cf = document.getElementById('vFloor').value;
+                filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
+            }
+            
+            filtered = filtered.filter(x => !swipedCardIds.has(x.id));
+            
+            if (currentSort.key) {
+                filtered.sort((a,b) => (a[currentSort.key] || "").localeCompare(b[currentSort.key] || "", undefined, {numeric:true}) * currentSort.order);
+            }
+            
+            const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const data = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
+            const listContainer = document.getElementById('cardListBody');
+            const tableContainer = document.getElementById('tableBody');
+            
+            if(isMarkMode) {
+                document.getElementById('tableViewContainer').classList.add('in-mark-mode');
+                document.getElementById('cardViewContainer').classList.add('in-mark-mode');
+            } else {
+                document.getElementById('tableViewContainer').classList.remove('in-mark-mode');
+                document.getElementById('cardViewContainer').classList.remove('in-mark-mode');
+            }
+
+            tableContainer.innerHTML = data.map(i => {
+                const s = checkDateStatus(i);
+                const isScrapped = (s === 3); 
+                const isSelected = markedPos.has(i.fullPos);
+                const colorClass = i.fullPos.includes('極冷') ? 'bg-cold' : (i.fullPos.includes('冷藏') ? 'bg-chill' : 'bg-ambient');
+                return `<tr class="${isSelected ? 'row-selected' : ''}" onclick="handleItemRowClick(event, '${i.fullPos}')">
+                    <td><span class="pos-badge ${colorClass}">${i.fullPos}</span></td>
+                    <td class="${isScrapped ? 'scrapped-text' : ''}">${i.name}</td>
+                    <td>${i.batch}</td>
+                    <td style="${s===1?'color:var(--warning);font-weight:bold':(s===2?'color:var(--danger);font-weight:bold':'')}">${i.date}</td>
+                    <td class="${isScrapped ? 'scrapped-text' : ''}" style="${s===3?'color:var(--danger);font-weight:bold':(s===4?'color:var(--task-color);font-weight:bold':'')}">${i.note || "-"}</td>
+                    <td>
+                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock(${i.id})">🔍 補貨</button>
+                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', ${i.id})">回報</button>
+                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', ${i.id})">✎</button>
+                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem(${i.id})">🗑️</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+
+            listContainer.innerHTML = data.map(i => {
+                const s = checkDateStatus(i);
+                const isScrapped = (s === 3); 
+                const isSelected = markedPos.has(i.fullPos);
+                const colorClass = i.fullPos.includes('極冷') ? 'bg-cold' : (i.fullPos.includes('冷藏') ? 'bg-chill' : 'bg-ambient');
+                return `<div class="info-card ${isSelected ? 'card-selected' : ''}" data-id="${i.id}" onclick="handleItemRowClick(event, '${i.fullPos}')">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                        <span class="pos-badge ${colorClass}">${i.fullPos}</span>
+                        <span style="font-size:12px; color:var(--text-dim);">批號: <b>${i.batch}</b></span>
+                    </div>
+                    <div style="font-size:15px; font-weight:bold;" class="${isScrapped ? 'scrapped-text' : ''}">${i.name}</div>
+                    <div style="font-size:13px; display:flex; justify-content:space-between;">
+                        <span>有效日期: <b style="${s===1?'color:var(--warning)':(s===2?'color:var(--danger)':'')}">${i.date}</b></span>
+                    </div>
+                    <div style="font-size:13px; background:rgba(0,0,0,0.2); padding:6px 10px; border-radius:8px; color:var(--text-dim);" class="${isScrapped ? 'scrapped-text' : ''}">
+                        備註說明: <span style="${s===3?'color:var(--danger);font-weight:bold':(s===4?'color:var(--task-color);font-weight:bold':'')}">${i.note || "-"}</span>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:2px; margin-top:4px;">
+                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock(${i.id})">🔍 補貨</button>
+                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', ${i.id})">回報</button>
+                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', ${i.id})">✎</button>
+                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem(${i.id})">🗑️</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('pagination').innerHTML = `
+                <button id="prevPageBtn" class="btn-main" style="padding:8px 14px;" onclick="changeP(-1, ${totalPages})">上一頁</button> 
+                <span style="margin:0 10px; font-weight:bold;">${currentPage} / ${totalPages}</span> 
+                <button id="nextPageBtn" class="btn-main" style="padding:8px 14px;" onclick="changeP(1, ${totalPages})">下一頁</button>
+            `;
+
+            bindSwipeEvents();
+        }
+
+        function bindSwipeEvents() {
+            const cards = document.querySelectorAll('.info-card');
+            cards.forEach(card => {
+                let startX = 0, startY = 0, moveX = 0, isSwiping = false;
+
+                card.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    isSwiping = true;
+                    card.style.transition = 'none';
+                }, { passive: true });
+
+                card.addEventListener('touchmove', (e) => {
+                    if (!isSwiping) return;
+                    moveX = e.touches[0].clientX - startX;
+                    let moveY = e.touches[0].clientY - startY;
+
+                    if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveX) < 10) {
+                        isSwiping = false;
+                        card.style.transform = '';
+                        return;
+                    }
+                    card.style.transform = `translateX(${moveX}px)`;
+                    card.style.opacity = (1 - Math.abs(moveX) / 300).toString();
+                }, { passive: true });
+
+                card.addEventListener('touchend', () => {
+                    if (!isSwiping) return;
+                    isSwiping = false;
+                    card.style.transition = 'all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+                    if (Math.abs(moveX) > 100) {
+                        const itemId = parseInt(card.getAttribute('data-id'));
+                        if (moveX > 0) {
+                            card.classList.add('swiped-out');
+                        } else {
+                            card.classList.add('swiped-out', 'swiped-out-left');
+                        }
+                        setTimeout(() => {
+                            swipedCardIds.add(itemId);
+                            renderTable();
+                        }, 200);
+                    } else {
+                        card.style.transform = '';
+                        card.style.opacity = '1';
+                    }
+                    moveX = 0;
+                });
+            });
+        }
+
+        function changeP(step, maxPages) { 
+            currentPage = Math.max(1, Math.min(maxPages, currentPage + step)); 
+            renderTable(); 
+        }
+
+        function handleCardSelectSort(val) {
+            if (val === 'default') { currentSort.key = ''; currentSort.order = 1; } 
+            else if (val === 'batch-asc') { currentSort.key = 'batch'; currentSort.order = 1; } 
+            else if (val === 'batch-desc') { currentSort.key = 'batch'; currentSort.order = -1; } 
+            else if (val === 'date-asc') { currentSort.key = 'date'; currentSort.order = 1; } 
+            else if (val === 'date-desc') { currentSort.key = 'date'; currentSort.order = -1; }
+            currentPage = 1; 
+            renderTable();
+        }
+
+        function findRestock(id) {
+            const currentItem = inventory.find(x => x.id === id);
+            if (!currentItem || !currentItem.name) return;
+            const currentZoneType = currentItem.zone.split('-')[0];
+            const matches = inventory.filter(x => {
+                const matchZoneType = x.zone.split('-')[0];
+                return x.name === currentItem.name && x.id !== id && matchZoneType === currentZoneType;
+            });
+            if (matches.length > 0) {
+                const posList = matches.map(x => x.fullPos).join(', ');
+                currentItem.note = currentItem.note ? `${currentItem.note} | 同凍庫儲位: ${posList}` : `同凍庫儲位: ${posList}`;
+                logAction("補貨查詢", `查詢品項 [${currentItem.name}]。聯動儲位為: ${posList}`);
+                alert(`已找到屬【${currentZoneType}】的 ${matches.length} 個同名品項，已更新備註！`);
+                
+                syncToCloud("update", currentItem);
+                saveDataLocalOnly();
+            } else {
+                alert(`在【${currentZoneType}】中未找到其他相同品項。`);
+            }
+        }
+
+        function toggleCardDetail(zoneName) {
+            let key = zoneName;
+            const arrowEl = document.getElementById(`arrow-${key}`);
+            const detailEl = document.getElementById(`detail-${key}`);
+            if (hiddenCardDetails.has(key)) {
+                hiddenCardDetails.delete(key);
+                if(detailEl) detailEl.style.display = 'block';
+                if(arrowEl) arrowEl.innerText = '▼';
+            } else {
+                hiddenCardDetails.add(key);
+                if(detailEl) detailEl.style.display = 'none';
+                if(arrowEl) arrowEl.innerText = '▶';
+            }
+        }
+
+        function closeStatCard(event, zoneName) {
+            event.stopPropagation();
+            let key = zoneName;
+            closedCards.add(key); 
+            const cardEl = document.getElementById(`card-${key}`);
+            if(cardEl) cardEl.style.display = 'none';
+        }
+
+        function toggleWarningMode() { 
+            isWarningMode = !isWarningMode; 
+            const btn = document.getElementById('warningBtn');
+            if (isWarningMode) {
+                btn.classList.add('active');
+                isMarkMode = false; 
+                document.getElementById('markBtn').classList.remove('active');
+            } else {
+                btn.classList.remove('active');
+            }
+            currentPage = 1;
+            renderAll(); 
+        }
+        
+        function toggleMarkMode() { 
+            isMarkMode = !isMarkMode; 
+            const btn = document.getElementById('markBtn');
+            if (isMarkMode) { 
+                btn.classList.add('active');
+                isWarningMode = false; 
+                document.getElementById('warningBtn').classList.remove('active');
+            } else {
+                btn.classList.remove('active');
+                logAction("標記篩選", `使用者篩選並觀看標記的 ${markedPos.size} 個庫位`);
+            } 
+            currentPage = 1;
+            renderAll(); 
+        }
+        
+        function deleteItem(id) { 
+            const target = inventory.find(x => x.id === id);
+            if(!target) return;
+            if(confirm("確定刪除此儲位資料並即時同步至雲端？")) { 
+                logAction("刪除", `移除儲位貨品數據 -> 儲位: ${target.fullPos} | 品名: [${target.name || '無'}]`);
+                
+                syncToCloud("delete", { id: id });
+
+                inventory = inventory.filter(x => x.id !== id); 
+                saveDataLocalOnly(); 
+            } 
+        }
+        
+        function openBox(type, id) {
+            const item = id ? inventory.find(x => x.id === id) : {zone:document.getElementById('vZone').value, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
+            document.getElementById('itemModal').style.display = 'block';
+            document.getElementById('editId').value = id || '';
+            document.getElementById('mZone').value = item.zone; document.getElementById('mFloor').value = item.floor; document.getElementById('mPos').value = item.pos;
+            document.getElementById('mName').value = item.name; document.getElementById('mBatch').value = item.batch; document.getElementById('mDate').value = item.date;
+            document.getElementById('mNote').value = item.note || "";
+            const isReport = (type === 'report');
+            document.getElementById('mPos').readOnly = isReport;
+            document.getElementById('editFields').style.display = isReport ? 'none' : 'block';
+            document.getElementById('reportFields').style.display = isReport ? 'block' : 'none';
+            document.getElementById('modalTitle').innerText = (type==='edit'?'編輯資料':(type==='add'?'手動新增儲位':'異常回報'));
+            document.getElementById('mStatusType').value = "";
+        }
+
+        function saveData() {
+            const id = document.getElementById('editId').value;
+            const isReportMode = document.getElementById('reportFields').style.display === 'block';
+            const entry = {
+                id: id ? parseInt(id) : Date.now(),
+                zone: document.getElementById('mZone').value, 
+                floor: document.getElementById('mFloor').value, 
+                pos: document.getElementById('mPos').value,
+                name: document.getElementById('mName').value, 
+                batch: document.getElementById('mBatch').value, 
+                date: document.getElementById('mDate').value, 
+                note: document.getElementById('mNote').value
+            };
+            entry.fullPos = `${entry.zone}${entry.floor}-${entry.pos}`;
+            
+            let logType = "修改"; let logDetail = "";
+            let syncAction = id ? "update" : "create";
+
+            if (isReportMode) {
+                const st = document.getElementById('mStatusType').value;
+                if(st) entry.note = `[${st}] ${entry.note}`;
+                logType = "回報"; logDetail = `狀態變更 -> 儲位: ${entry.fullPos} | 備註: ${entry.note}`;
+            } else {
+                if(!id) {
+                    logType = "新增"; logDetail = `手動新增 -> 儲位: ${entry.fullPos} | 品名: [${entry.name}]`;
+                } else {
+                    logType = "修改"; logDetail = `更新儲位 -> 儲位: ${entry.fullPos} | 品名: [${entry.name}]`;
+                }
+            }
+            logAction(logType, logDetail);
+
+            if(id) {
+                let index = inventory.findIndex(x=>x.id==id);
+                if(index !== -1) inventory[index] = entry;
+            } else {
+                inventory.push(entry);
+            }
+
+            closeModal(); 
+            syncToCloud(syncAction, entry);
+            saveDataLocalOnly();
+        }
+
+        function adminLogin() { 
+            const btn = document.getElementById('adminLoginBtn');
+            if (!isAdmin) { 
+                const pw = prompt("密碼:"); 
+                if (pw === "admin123") {
+                    isAdmin = true; 
+                    btn.classList.add('active');
+                } else return; 
+            } else { 
+                isAdmin = false; 
+                btn.classList.remove('active');
+            } 
+            btn.innerText = isAdmin ? "🔓 管理中" : "🔐 管理模式"; 
+            document.getElementById('manualAddBtn').style.display = isAdmin ? 'inline-block' : 'none'; 
+            renderTable(); 
+        }
+        
+        function toggleAdminPanel() { 
+            const p = document.getElementById('admin-panel'); 
+            const btn = document.getElementById('adminPanelBtn');
+            if(p.style.display === 'none') {
+                p.style.display = 'block';
+                btn.classList.add('active');
+            } else {
+                p.style.display = 'none';
+                btn.classList.remove('active');
+            }
+        }
+
+        function updateStats() {
+            const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-開", "冷藏庫-右", "常溫區"];
+            zones.forEach(z => {
+                let dataZone = z;
+                let domZone = z;
+
+                const cardEl = document.getElementById(`card-${domZone}`);
+                if (closedCards.has(domZone)) { 
+                    if (cardEl) cardEl.style.display = 'none'; 
+                    return; 
+                } else { 
+                    if (cardEl) cardEl.style.display = 'block'; 
+                }
+
+                let totalOcc = 0; let floorDetails = [];
+                ["1F","2F","3F","4F"].forEach(f => { 
+                    let floorOcc = 0;
+                    for(let i=1; i<=22; i++) {
+                        if(inventory.some(x => x.fullPos === `${dataZone}${f}-${i}`)) { 
+                            floorOcc++; totalOcc++; 
+                        }
+                    }
+                    floorDetails.push(`${f}:<span class="stat-num-highlight">${22 - floorOcc}</span>`);
+                });
+                
+                const emptyTargetId = (domZone === "極冷庫-左") ? "empty-極冷庫-開" : `empty-${domZone}`;
+                const targetEmptyEl = document.getElementById(emptyTargetId);
+                if(targetEmptyEl) targetEmptyEl.innerText = 88 - totalOcc;
+                
+                let targetDetailId = (domZone === "冷藏庫-開") ? "detail-冷藏庫-left" : `detail-${domZone}`;
+                const detailEl = document.getElementById(targetDetailId);
+                if(detailEl) {
+                    detailEl.innerHTML = floorDetails.join(" | ");
+                    detailEl.style.display = hiddenCardDetails.has(domZone) ? 'none' : 'block';
+                    const arrowEl = document.getElementById(`arrow-${domZone}`);
+                    if(arrowEl) arrowEl.innerText = hiddenCardDetails.has(domZone) ? '▶' : '▼';
+                }
+            });
+        }
+        
+        function onSearch() { 
+            currentPage = 1; renderTable(); 
+            const kw = document.getElementById('searchInput').value.trim();
+            if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => { if (kw !== "") logAction("搜尋查詢", `關鍵字: "${kw}"`); }, 800);
+        }
+
+        function clearSearch() { 
+            document.getElementById('searchInput').value = ''; 
+            markedPos.clear();
+            swipedCardIds.clear(); 
+            logAction("搜尋查詢", `重置總覽`); 
+            renderAll(); 
+        }
+        
+        function sortTable(k) { 
+            if(currentSort.key===k) currentSort.order*=-1; 
+            else {currentSort.key=k; currentSort.order=1;} 
+            renderTable(); 
+        }
+        
+        function closeModal() { document.getElementById('itemModal').style.display = 'none'; }
+        
+        function saveDataLocalOnly() { 
+            localStorage.setItem('offlineData_V23_7', JSON.stringify(inventory)); 
+            renderAll(); 
+        }
+        
+        function renderAll() { renderVisual(); renderTable(); }
+        
+        function handleFile(input) { 
+            const reader = new FileReader(); 
+            reader.onload = (e) => { 
+                const data = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result), {type:'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result), {type:'array'}).SheetNames[0]], {header:1}); 
+                processExcelData(data);
+            }; 
+            reader.readAsArrayBuffer(input.files[0]); 
+        }
+
+        async function fetchRemoteExcel() {
+            const url = 'https://mingfonglpg-bit.github.io/-1-1/擴充凍庫.xlsx';
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('網路回應不成功');
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(new Uint8Array(arrayBuffer), {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const data = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {header: 1});
+                
+                processExcelData(data);
+                logAction("系統遠端匯入", `成功從網路端下載並匯入擴充凍庫資料。`);
+                alert("遠端擴充凍庫資料取得並匯入成功！");
+            } catch (error) {
+                console.error('Fetch 錯誤:', error);
+                alert("無法取得遠端資料，請檢查網路連線或 CORS 設定。");
+            }
+        }
+
+        function processExcelData(data) {
+            inventory = data.slice(1).map((r, i) => {
+                let rawZone = String(r[1]||"").trim();
+                if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
+                if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
+                if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-左";
+                return { 
+                    id: Date.now() + i, 
+                    zone: rawZone, 
+                    floor: String(r[2]||"").trim(), 
+                    pos: String(r[3]||"").trim(), 
+                    fullPos: `${rawZone}${r[2]}-${r[3]}`, 
+                    name: String(r[4]||""), 
+                    batch: String(r[5]||""), 
+                    date: r[6] ? (typeof r[6]==='number'?new Date((r[6]-25569)*86400*1000).toISOString().split('T')[0]:r[6]) : "-", 
+                    note: String(r[7]||"") 
+                };
+            }).filter(x => x.zone); 
+            swipedCardIds.clear(); 
+            logAction("系統匯入", `匯入全庫資料共 ${inventory.length} 筆。`);
+            
+            syncToCloud("batch_import", inventory);
+            saveDataLocalOnly(); 
+        }
+
+        function exportExcel() { 
+            const cleanInventory = inventory.map(({ fullPos, ...rest }) => rest);
+            const ws = XLSX.utils.json_to_sheet(cleanInventory); 
+            const wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, ws, "Inventory"); 
+            XLSX.writeFile(wb, "Inventory.xlsx"); 
+        }
+
+        function exportActionLogs() {
+            if (actionLogs.length === 0) { alert("目前尚未產生操作軌跡。"); return; }
+            const wb = XLSX.utils.book_new();
+            const wsLogs = XLSX.utils.json_to_sheet(actionLogs);
+            wsLogs['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 75 }];
+            XLSX.utils.book_append_sheet(wb, wsLogs, "系統操作行為審計");
+            const now = new Date();
+            const dateStr = now.getFullYear() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0');
+            XLSX.writeFile(wb, `行動端系統日誌_${dateStr}.xlsx`);
+        }
+    </script>
+</body>
+</html>
