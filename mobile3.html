@@ -59,6 +59,7 @@
         
         .slot:active { transform: scale(0.92); background: rgba(255,255,255,0.1); }
         
+        /* 連動新增的效期聚焦透明度樣式 */
         .focus-warning .slot:not(.status-warning) { opacity: 0.2; }
         .focus-marked .slot:not(.status-marked) { opacity: 0.2; }
         
@@ -139,7 +140,7 @@
     <div class="dashboard">
         <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
             <div class="stat-label">
-                <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-慢">▼</span></span>
+                <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
             </div>
             <div id="empty-極冷庫-左" class="stat-value">--</div> 
@@ -156,15 +157,15 @@
         <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
             <div class="stat-label">
                 <span>🍏 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-開')">×</button>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
             </div>
-            <div id="empty-冷藏庫-左" class="stat-value">--</div> 
+            <div id="empty-冷藏庫-慢" class="stat-value">--</div> 
             <div id="detail-冷藏庫-左" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
             <div class="stat-label">
                 <span>🍏 冷藏庫-右<span id="arrow-冷藏庫-右">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-密')">×</button>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
             </div>
             <div id="empty-冷藏庫-右" class="stat-value">--</div> 
             <div id="detail-冷藏庫-右" class="stat-detail"></div>
@@ -195,6 +196,8 @@
         </select>
         <button id="warningBtn" class="btn-main" style="background:var(--warning)" onclick="toggleWarningMode()">⚠️ 效期急件</button>
         <button id="markBtn" class="btn-main" style="background:var(--marked)" onclick="toggleMarkMode()">🔮 標記篩選</button>
+        <button id="expiry30Btn" class="btn-main" style="background:#8b5cf6;" onclick="toggleExpiryFilterMode(30)">📅 30天內到期</button>
+        <button id="expiry60Btn" class="btn-main" style="background:#a78bfa;" onclick="toggleExpiryFilterMode(60)">📅 60天內到期</button>
     </div>
 
     <div class="visual-grid" id="visualGrid"></div>
@@ -316,18 +319,18 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRAkxznOGm8vrsyCAmFio72oybR0JGOGq9qwgFCQTQhXK6ZNDlTxgSBvDaIWKrmutfcA/exec";
 
-        // 🎯 設定各個區域「單層樓」的總庫位數規格
         const ZONE_CONFIG = {
             "極冷庫-左": 22,   
             "極冷庫-右": 22,   
-            "冷藏庫-left": 17, // 相容處理
-            "冷藏庫-左": 17,   // 🎯 開放式冷藏庫改為 17 庫位
-            "冷藏庫-右": 14,   // 🎯 密閉式冷藏庫改為 14 庫位
-            "常溫區": 5        // 🎯 常溫區改為 5 庫位
+            "冷藏庫-左": 17,   
+            "冷藏庫-右": 14,   
+            "常溫區": 5        
         };
 
         let inventory = [];
         let isWarningMode = false, isMarkMode = false, isAdmin = false;
+        // 🎯 重點改動：定義效期篩選狀態變數 (0表示關閉, 30或60表示啟用對應天數篩選)
+        let expiryFilterDays = 0; 
         let markedPos = new Set();
         let currentSort = { key: '', order: 1 };
         let currentPage = 1, rowsPerPage = 10;
@@ -376,6 +379,12 @@
             return 0;
         }
 
+        // 🎯 重點改動：輔助函式計算剩餘有效天數
+        function getDiffDays(dateStr) {
+            if (!dateStr || dateStr === "-") return 999;
+            return Math.ceil((new Date(dateStr) - new Date().setHours(0,0,0,0)) / 86400000);
+        }
+
         async function enterSystem() {
             showToast("☁️ 正在連線下載雲端庫存...", 0);
             try {
@@ -385,7 +394,6 @@
                 if (resData.status === "success") {
                     inventory = resData.data.map(item => {
                         let rawZone = String(item.zone || "").trim();
-                        // 🎯 確保後端傳來的舊有名稱能正確對應到「冷藏庫-左」
                         if(rawZone === "冷藏庫-慢" || rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
                         if(rawZone === "冷藏庫-right") rawZone = "冷藏庫-右";
                         const rawFloor = String(item.floor || "").trim();
@@ -439,26 +447,26 @@
 
         function renderVisual() {
             let z = document.getElementById('vZone').value, f = document.getElementById('vFloor').value;
-            // 🎯 點選前端選單名稱的相容轉換
-            if(z === "冷藏庫-慢" || z === "冷藏庫-left") z = "冷藏庫-慢"; // 與原本邏輯一致
-            let mappedConfigKey = z;
-            if(z === "冷藏庫-慢" || z === "冷藏庫-左") mappedConfigKey = "冷藏庫-左";
+            if(z === "冷藏庫-慢" || z === "冷藏庫-left") z = "冷藏庫-開"; // 相容舊對應
+            if(z === "冷藏庫-左") z = "冷藏庫-左";
+            if(z === "冷藏庫-右") z = "冷藏庫-右";
 
             const grid = document.getElementById('visualGrid'); 
             grid.innerHTML = '';
-            grid.className = 'visual-grid' + (isWarningMode ? ' focus-warning' : '') + (isMarkMode ? ' focus-marked' : '');
             
-            // 🎯 動態讀取新規格的配置上限來畫出格子
-            const maxSlots = ZONE_CONFIG[mappedConfigKey] || 22; 
+            // 🎯 重點改動：如果是效期篩選模式，同樣加上高對比聚焦 css 類別控制透明度
+            const isAnyMarkActive = isMarkMode || (expiryFilterDays > 0);
+            grid.className = 'visual-grid' + (isWarningMode ? ' focus-warning' : '') + (isAnyMarkActive ? ' focus-marked' : '');
+            
+            const maxSlots = ZONE_CONFIG[document.getElementById('vZone').value] || 22; 
             
             for (let i = 1; i <= maxSlots; i++) {
-                let checkZoneName = z;
-                if(z === "冷藏庫-慢") checkZoneName = "冷藏庫-左";
-                const full = `${checkZoneName}${f}-${i}`;
+                const full = `${document.getElementById('vZone').value}${f}-${i}`;
                 const items = inventory.filter(x => x.fullPos === full);
                 const slot = document.createElement('div');
                 slot.className = 'slot'; 
                 
+                let isExpiryMatch = false;
                 if (items.length > 0) {
                     slot.classList.add('occupied');
                     const s = items.map(x => checkDateStatus(x));
@@ -466,8 +474,26 @@
                     else if (s.includes(4)) slot.classList.add('status-task');
                     else if (s.includes(1)) slot.classList.add('status-warning');
                     if (items.some(x => (x.note && x.note.trim() !== ""))) slot.classList.add('has-note');
+
+                    // 🎯 重點改動：檢查是否符合30天或60天到期條件
+                    if (expiryFilterDays === 30) {
+                        isExpiryMatch = items.some(x => {
+                            const diff = getDiffDays(x.date);
+                            return diff >= 0 && diff <= 30;
+                        });
+                    } else if (expiryFilterDays === 60) {
+                        isExpiryMatch = items.some(x => {
+                            const diff = getDiffDays(x.date);
+                            return diff > 30 && diff <= 60; // 完美剔除30天以內
+                        });
+                    }
                 }
-                if (markedPos.has(full)) slot.classList.add('status-marked');
+
+                // 🎯 重點改動：如果被手動標記 OR 符合新版效期篩選，該庫位套用變色
+                if (markedPos.has(full) || isExpiryMatch) {
+                    slot.classList.add('status-marked');
+                }
+
                 slot.innerHTML = `<div>${i}</div>`;
                 slot.onclick = () => { 
                     document.getElementById('searchInput').value = `pos:${full}`; 
@@ -491,6 +517,18 @@
             
             if (isWarningMode) {
                 filtered = inventory.filter(x => checkDateStatus(x) === 1);
+            } else if (expiryFilterDays === 30 && kw === '') {
+                // 🎯 重點改動：30天到期模式下資料列表連動篩選
+                filtered = inventory.filter(x => {
+                    const diff = getDiffDays(x.date);
+                    return diff >= 0 && diff <= 30;
+                });
+            } else if (expiryFilterDays === 60 && kw === '') {
+                // 🎯 重點改動：60天到期模式下資料列表連動篩選 (排除30天內)
+                filtered = inventory.filter(x => {
+                    const diff = getDiffDays(x.date);
+                    return diff > 30 && diff <= 60;
+                });
             } else if (isMarkMode && markedPos.size > 0 && kw === '') {
                 filtered = inventory.filter(x => markedPos.has(x.fullPos));
             } else if (kw.startsWith("pos:")) {
@@ -519,7 +557,8 @@
             const listContainer = document.getElementById('cardListBody');
             const tableContainer = document.getElementById('tableBody');
             
-            if(isMarkMode) {
+            const isAnyMarkActive = isMarkMode || (expiryFilterDays > 0);
+            if(isAnyMarkActive) {
                 document.getElementById('tableViewContainer').classList.add('in-mark-mode');
                 document.getElementById('cardViewContainer').classList.add('in-mark-mode');
             } else {
@@ -580,6 +619,29 @@
             `;
 
             bindSwipeEvents();
+        }
+
+        // 🎯 重點改動：新增效期控制按鈕點擊切換邏輯
+        function toggleExpiryFilterMode(days) {
+            if (expiryFilterDays === days) {
+                expiryFilterDays = 0; // 如果重複點擊則取消篩選
+                document.getElementById(`expiry${days}Btn`).classList.remove('active');
+            } else {
+                expiryFilterDays = days;
+                // 清除其他互斥按鈕狀態
+                isWarningMode = false;
+                isMarkMode = false;
+                document.getElementById('warningBtn').classList.remove('active');
+                document.getElementById('markBtn').classList.remove('active');
+                document.getElementById('expiry30Btn').classList.remove('active');
+                document.getElementById('expiry60Btn').classList.remove('active');
+                
+                // 激活當前按鈕
+                document.getElementById(`expiry${days}Btn`).classList.add('active');
+                logAction("效期篩選", `使用者查看 ${days} 天內到期品項網格`);
+            }
+            currentPage = 1;
+            renderAll();
         }
 
         function bindSwipeEvents() {
@@ -671,6 +733,8 @@
 
         function toggleCardDetail(zoneName) {
             let key = zoneName;
+            if(key === "冷藏庫-left") key = "冷藏庫-左";
+            if(key === "冷藏庫-right") key = "冷藏庫-右";
             const arrowEl = document.getElementById(`arrow-${zoneName}`);
             const detailEl = document.getElementById(`detail-${zoneName}`);
             if (hiddenCardDetails.has(key)) {
@@ -686,23 +750,11 @@
 
         function closeStatCard(event, id) {
             event.stopPropagation();
-            let domId = id;
-            if(id === '極冷庫-慢') domId = '極冷庫-左';
-            if(id === '冷藏庫-開') domId = '冷藏庫-左';
-            if(id === '冷藏庫-密') domId = '冷藏庫-右';
-            const cardEl = document.getElementById(`card-${domId}`);
+            const cardEl = document.getElementById(`card-${id}`) || event.currentTarget.closest('.stat-card');
             if(cardEl) {
                 cardEl.style.display = 'none';
-                closedCards.add(domId);
+                closedCards.add(id);
             }
-        }
-
-        function mapZoneKeyForDom(z) {
-            if (z === "極冷庫-左") return "極冷庫-左";
-            if (z === "極冷庫-右") return "極冷庫-右";
-            if (z === "冷藏庫-左" || z === "冷藏庫-left" || z === "冷藏庫-慢") return "冷藏庫-左";
-            if (z === "冷藏庫-右" || z === "冷藏庫-right") return "冷藏庫-右";
-            return "常溫區";
         }
 
         function toggleWarningMode() { 
@@ -711,7 +763,10 @@
             if (isWarningMode) {
                 btn.classList.add('active');
                 isMarkMode = false; 
+                expiryFilterDays = 0; // 互斥關閉
                 document.getElementById('markBtn').classList.remove('active');
+                document.getElementById('expiry30Btn').classList.remove('active');
+                document.getElementById('expiry60Btn').classList.remove('active');
             } else {
                 btn.classList.remove('active');
             }
@@ -725,7 +780,10 @@
             if (isMarkMode) { 
                 btn.classList.add('active');
                 isWarningMode = false; 
+                expiryFilterDays = 0; // 互斥關閉
                 document.getElementById('warningBtn').classList.remove('active');
+                document.getElementById('expiry30Btn').classList.remove('active');
+                document.getElementById('expiry60Btn').classList.remove('active');
             } else {
                 btn.classList.remove('active');
                 logAction("標記篩選", `使用者篩選並觀看標記的 ${markedPos.size} 個庫位`);
@@ -846,14 +904,11 @@
             }
         }
 
-        // 🎯 已完美修復無顯示庫位（看板顯示 --）的 BUG
         function updateStats() {
-            // 🚀 將這裡的 domId 修改與 HTML 中的真實看板 id 一致
             const zoneMappings = [
                 { key: "極冷庫-左", domId: "極冷庫-左" },
                 { key: "極冷庫-右", domId: "極冷庫-右" },
-                { key: "冷藏庫-left", domId: "冷藏庫-左" }, // 相容處理
-                { key: "冷藏庫-左", domId: "冷藏庫-left" },   // 真實映射
+                { key: "冷藏庫-左", domId: "冷藏庫-慢" },
                 { key: "冷藏庫-右", domId: "冷藏庫-右" },
                 { key: "常溫區", domId: "常溫區" }
             ];
@@ -861,8 +916,7 @@
             const processedDom = new Set();
 
             zoneMappings.forEach(mapping => {
-                let domKey = mapping.key;
-                if(domKey === "冷藏庫-left") domKey = "冷藏庫-左";
+                const domKey = mapping.key;
                 if (processedDom.has(domKey)) return;
                 processedDom.add(domKey);
 
@@ -872,7 +926,6 @@
                     return; 
                 }
 
-                // 🌟 自動獲取對應配置的每層儲位數
                 const slotsPerFloor = ZONE_CONFIG[domKey] || 22;
                 const totalSlotsForZone = slotsPerFloor * 4; 
 
@@ -884,8 +937,7 @@
                     for(let i = 1; i <= slotsPerFloor; i++) {
                         if(inventory.some(x => {
                             const matchZ = x.zone;
-                            const isMatch = (matchZ === domKey || 
-                                            (domKey === "冷藏庫-左" && (matchZ === "冷藏庫-left" || matchZ === "冷藏庫-慢")));
+                            const isMatch = (matchZ === domKey);
                             return isMatch && x.floor === f && String(x.pos) === String(i);
                         })) { 
                             floorOcc++; totalOcc++; 
@@ -894,8 +946,7 @@
                     floorDetails.push(`${f}:<span class="stat-num-highlight">${slotsPerFloor - floorOcc}</span>`);
                 });
                 
-                // 🎯 修正核心：正確獲取 HTML 中定義的 id 元素
-                const targetEmptyEl = document.getElementById(`empty-${domKey}`);
+                const targetEmptyEl = document.getElementById(`empty-${mapping.domId}`);
                 if(targetEmptyEl) targetEmptyEl.innerText = totalSlotsForZone - totalOcc;
                 
                 const detailEl = document.getElementById(`detail-${domKey}`);
@@ -919,6 +970,9 @@
             document.getElementById('searchInput').value = ''; 
             markedPos.clear();
             swipedCardIds.clear(); 
+            expiryFilterDays = 0; // 清除效期篩選
+            document.getElementById('expiry30Btn').classList.remove('active');
+            document.getElementById('expiry60Btn').classList.remove('active');
             logAction("搜尋查詢", `重置總覽`); 
             renderAll(); 
         }
@@ -971,7 +1025,7 @@
                 let rawZone = String(r[1]||"").trim();
                 if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
                 if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
-                if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-慢"; // 保持原廠轉換
+                if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-左";
                 if(rawZone === "冷藏庫-right") rawZone = "冷藏庫-右";
                 return { 
                     id: Date.now() + i, 
