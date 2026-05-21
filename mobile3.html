@@ -667,10 +667,20 @@
                     if (Math.abs(moveX) > 100) {
                         const itemId = parseInt(card.getAttribute('data-id'));
                         if (moveX > 0) {
+
+// 🚀 向右滑動：跳轉並帶入參數
+                            if (itemData && itemData.name) {
+                                showToast("查詢庫存中...", 2000);
+                                const searchUrl = `https://mingfonglpg-bit.github.io/-/count.htm?search=${encodeURIComponent(itemData.name)}`;
+                                setTimeout(() => {
+                                    window.location.href = searchUrl;
+                                }, 500);
+                            }
                             card.classList.add('swiped-out');
                         } else {
                             card.classList.add('swiped-out', 'swiped-out-left');
                         }
+
                         setTimeout(() => {
                             swipedCardIds.add(itemId);
                             renderTable();
