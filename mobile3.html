@@ -633,7 +633,7 @@
             renderAll();
         }
 
-        function bindSwipeEvents() {
+       function bindSwipeEvents() {
             const cards = document.querySelectorAll('.info-card');
             cards.forEach(card => {
                 let startX = 0, startY = 0, moveX = 0, isSwiping = false;
@@ -650,6 +650,7 @@
                     moveX = e.touches[0].clientX - startX;
                     let moveY = e.touches[0].clientY - startY;
 
+                    // 若垂直滑動大於水平滑動，取消滑動判定
                     if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveX) < 10) {
                         isSwiping = false;
                         card.style.transform = '';
@@ -664,28 +665,35 @@
                     isSwiping = false;
                     card.style.transition = 'all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
+                    // 判斷滑動距離
                     if (Math.abs(moveX) > 100) {
                         const itemId = parseInt(card.getAttribute('data-id'));
-                        if (moveX > 0) {
+                        const itemData = inventory.find(x => x.id === itemId);
 
-// 🚀 向右滑動：跳轉並帶入參數
+                        if (moveX > 0) {
+                            // 🚀 向右滑動：跳轉並帶入參數
                             if (itemData && itemData.name) {
+                                // 顯示提示
                                 showToast("查詢庫存中...", 2000);
+                                
+                                // 組合 URL
                                 const searchUrl = `https://mingfonglpg-bit.github.io/-/count.htm?search=${encodeURIComponent(itemData.name)}`;
+                                
+                                // 延遲跳轉以確保使用者能看到提示
                                 setTimeout(() => {
                                     window.location.href = searchUrl;
                                 }, 500);
                             }
-                            card.classList.add('swiped-out');
                         } else {
+                            // ⬅️ 向左滑動：原功能移除字卡
                             card.classList.add('swiped-out', 'swiped-out-left');
+                            setTimeout(() => {
+                                swipedCardIds.add(itemId);
+                                renderTable();
+                            }, 200);
                         }
-
-                        setTimeout(() => {
-                            swipedCardIds.add(itemId);
-                            renderTable();
-                        }, 200);
                     } else {
+                        // 若滑動距離不足，恢復原位
                         card.style.transform = '';
                         card.style.opacity = '1';
                     }
