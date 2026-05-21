@@ -107,7 +107,6 @@
 <body>
 
     <div class="header">
-        <h1>⚡ 倉儲庫位控管系統</h1>
         <div style="display:flex; gap:6px;">
             <button id="adminLoginBtn" class="btn-main" style="background:#334155" onclick="adminLogin()">🔐 管理模式</button>
             <button id="adminPanelBtn" class="btn-main" style="background:#475569;" onclick="toggleAdminPanel()">⚙️ 工具</button>
@@ -192,10 +191,10 @@
 
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="🔍 輸入關鍵字自動搜尋品項/批號/備註..." oninput="onSearch()">
-        <button class="btn-main" style="background:#475569" onclick="clearSearch()">重置</button>
+        <button class="btn-main" style="background:#475569" onclick="clearSearch()">❌</button>
         
         <select id="cardSortSelect" onchange="handleCardSelectSort(this.value)" style="background:#334155; color:#fff; border:1px solid var(--border); padding:0 8px; border-radius:10px; font-size:12px; outline:none; margin-left:2px;">
-            <option value="default">默認排序</option>
+            <option value="default">排序</option>
             <option value="batch-asc">批號 ↗</option>
             <option value="batch-desc">批號 ↘</option>
             <option value="date-asc">效期 ↗</option>
