@@ -44,23 +44,17 @@
         .nav-control { display: flex; gap: 6px; margin-bottom: 12px; background: var(--card-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; white-space: nowrap; }
         .nav-control select { background: #334155; color: #fff; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; outline: none; }
         
-        /* 🚀 儲位格配色樣式重構（增強黑暗模式對比度與質感） */
         .visual-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; }
         .slot { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; height: 48px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: 700; color: var(--text-dim); position: relative; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
         .slot div { font-size: 15px; }
         
-        /* 正常有存貨：飽和靛藍 */
         .slot.occupied { background: var(--slot-occupied); border-color: #818cf8; color: #fff; }
         .slot.occupied::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; }
         .slot.has-note::after { background: #22d3ee !important; width: 7px; height: 7px; }
         
-        /* 效期急件：琥珀橘 */
         .slot.status-warning { background: var(--slot-warning) !important; border-color: #fb923c !important; color: #ffedd5 !important; }
-        /* 報廢/過期危險：深警示紅 */
         .slot.status-danger { background: var(--slot-danger) !important; border-color: #f87171 !important; color: #fee2e2 !important; }
-        /* 盤點/異動任務：現場深綠 */
         .slot.status-task { background: var(--slot-task) !important; border-color: #34d399 !important; color: #ecfdf5 !important; }
-        /* 標記篩選：霓虹深紫 */
         .slot.status-marked { background: var(--slot-marked) !important; border-color: #c084fc !important; color: #f3e8ff !important; box-shadow: inset 0 0 8px rgba(168, 85, 247, 0.6); }
         
         .slot:active { transform: scale(0.92); background: rgba(255,255,255,0.1); }
@@ -143,12 +137,12 @@
     </div>
 
     <div class="dashboard">
-        <div class="stat-card" id="card-極冷庫-慢" onclick="toggleCardDetail('極冷庫-左')">
+        <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
             <div class="stat-label">
-                <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
+                <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-慢">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
             </div>
-            <div id="empty-極冷庫-左" class="stat-value">--</div>
+            <div id="empty-極冷庫-左" class="stat-value">--</div> 
             <div id="detail-極冷庫-左" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
@@ -159,20 +153,20 @@
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="stat-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-left')">
+        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
             <div class="stat-label">
                 <span>🍏 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-開')">×</button>
             </div>
-            <div id="empty-冷藏庫-左" class="stat-value">--</div>
+            <div id="empty-冷藏庫-左" class="stat-value">--</div> 
             <div id="detail-冷藏庫-左" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
             <div class="stat-label">
-                <span>🍏 冷藏庫-右 <span id="arrow-冷藏庫-右">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
+                <span>🍏 冷藏庫-右<span id="arrow-冷藏庫-右">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-密')">×</button>
             </div>
-            <div id="empty-冷藏庫-右" class="stat-value">--</div>
+            <div id="empty-冷藏庫-右" class="stat-value">--</div> 
             <div id="detail-冷藏庫-右" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
@@ -254,7 +248,7 @@
                         <select id="mZone">
                             <option value="極冷庫-左">極冷庫-左</option>
                             <option value="極冷庫-右">極冷庫-右</option>
-                            <option value="冷藏庫-左">冷藏庫-左</option>
+                            <option value="冷藏庫-慢">冷藏庫-左</option>
                             <option value="冷藏庫-右">冷藏庫-右</option>
                             <option value="常溫區">常溫區</option>
                         </select>
@@ -322,6 +316,16 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRAkxznOGm8vrsyCAmFio72oybR0JGOGq9qwgFCQTQhXK6ZNDlTxgSBvDaIWKrmutfcA/exec";
 
+        // 🎯 設定各個區域「單層樓」的總庫位數規格
+        const ZONE_CONFIG = {
+            "極冷庫-左": 22,   
+            "極冷庫-右": 22,   
+            "冷藏庫-left": 17, // 相容處理
+            "冷藏庫-左": 17,   // 🎯 開放式冷藏庫改為 17 庫位
+            "冷藏庫-右": 14,   // 🎯 密閉式冷藏庫改為 14 庫位
+            "常溫區": 5        // 🎯 常溫區改為 5 庫位
+        };
+
         let inventory = [];
         let isWarningMode = false, isMarkMode = false, isAdmin = false;
         let markedPos = new Set();
@@ -380,7 +384,10 @@
                 const resData = await response.json();
                 if (resData.status === "success") {
                     inventory = resData.data.map(item => {
-                        const rawZone = String(item.zone || "").trim();
+                        let rawZone = String(item.zone || "").trim();
+                        // 🎯 確保後端傳來的舊有名稱能正確對應到「冷藏庫-左」
+                        if(rawZone === "冷藏庫-慢" || rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
+                        if(rawZone === "冷藏庫-right") rawZone = "冷藏庫-右";
                         const rawFloor = String(item.floor || "").trim();
                         const rawPos = String(item.pos || "").trim();
                         return {
@@ -431,13 +438,23 @@
         }
 
         function renderVisual() {
-            const z = document.getElementById('vZone').value, f = document.getElementById('vFloor').value;
+            let z = document.getElementById('vZone').value, f = document.getElementById('vFloor').value;
+            // 🎯 點選前端選單名稱的相容轉換
+            if(z === "冷藏庫-慢" || z === "冷藏庫-left") z = "冷藏庫-慢"; // 與原本邏輯一致
+            let mappedConfigKey = z;
+            if(z === "冷藏庫-慢" || z === "冷藏庫-左") mappedConfigKey = "冷藏庫-左";
+
             const grid = document.getElementById('visualGrid'); 
             grid.innerHTML = '';
             grid.className = 'visual-grid' + (isWarningMode ? ' focus-warning' : '') + (isMarkMode ? ' focus-marked' : '');
             
-            for (let i = 1; i <= 22; i++) {
-                const full = `${z}${f}-${i}`;
+            // 🎯 動態讀取新規格的配置上限來畫出格子
+            const maxSlots = ZONE_CONFIG[mappedConfigKey] || 22; 
+            
+            for (let i = 1; i <= maxSlots; i++) {
+                let checkZoneName = z;
+                if(z === "冷藏庫-慢") checkZoneName = "冷藏庫-左";
+                const full = `${checkZoneName}${f}-${i}`;
                 const items = inventory.filter(x => x.fullPos === full);
                 const slot = document.createElement('div');
                 slot.className = 'slot'; 
@@ -482,7 +499,9 @@
             } else if (kw) {
                 filtered = inventory.filter(x => (x.fullPos + x.name + x.batch + (x.note || "")).toLowerCase().includes(kw));
             } else {
-                const cz = document.getElementById('vZone').value, cf = document.getElementById('vFloor').value;
+                let cz = document.getElementById('vZone').value, cf = document.getElementById('vFloor').value;
+                if(cz === "冷藏庫-慢" || cz === "冷藏庫-left") cz = "冷藏庫-左";
+                if(cz === "冷藏庫-right") cz = "冷藏庫-右";
                 filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
             }
             
@@ -652,8 +671,8 @@
 
         function toggleCardDetail(zoneName) {
             let key = zoneName;
-            const arrowEl = document.getElementById(`arrow-${key}`);
-            const detailEl = document.getElementById(`detail-${key}`);
+            const arrowEl = document.getElementById(`arrow-${zoneName}`);
+            const detailEl = document.getElementById(`detail-${zoneName}`);
             if (hiddenCardDetails.has(key)) {
                 hiddenCardDetails.delete(key);
                 if(detailEl) detailEl.style.display = 'block';
@@ -665,19 +684,23 @@
             }
         }
 
-        function closeStatCard(event, zoneName) {
+        function closeStatCard(event, id) {
             event.stopPropagation();
-            let key = zoneName;
-            closedCards.add(key); 
-            const cardEl = document.getElementById(`card-${key}`);
-            if(cardEl) cardEl.style.display = 'none';
+            let domId = id;
+            if(id === '極冷庫-慢') domId = '極冷庫-左';
+            if(id === '冷藏庫-開') domId = '冷藏庫-左';
+            if(id === '冷藏庫-密') domId = '冷藏庫-右';
+            const cardEl = document.getElementById(`card-${domId}`);
+            if(cardEl) {
+                cardEl.style.display = 'none';
+                closedCards.add(domId);
+            }
         }
 
-        // 🚀 修正點：防呆防錯字機制
         function mapZoneKeyForDom(z) {
             if (z === "極冷庫-左") return "極冷庫-左";
             if (z === "極冷庫-右") return "極冷庫-右";
-            if (z === "冷藏庫-左" || z === "冷藏庫-left") return "冷藏庫-左";
+            if (z === "冷藏庫-左" || z === "冷藏庫-left" || z === "冷藏庫-慢") return "冷藏庫-左";
             if (z === "冷藏庫-右" || z === "冷藏庫-right") return "冷藏庫-右";
             return "常溫區";
         }
@@ -725,10 +748,14 @@
         }
         
         function openBox(type, id) {
-            const item = id ? inventory.find(x => x.id === id) : {zone:document.getElementById('vZone').value, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
+            let zVal = document.getElementById('vZone').value;
+            if(zVal === "冷藏庫-慢" || zVal === "冷藏庫-left") zVal = "冷藏庫-左";
+            if(zVal === "冷藏庫-right") zVal = "冷藏庫-右";
+
+            const item = id ? inventory.find(x => x.id === id) : {zone:zVal, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
             document.getElementById('itemModal').style.display = 'block';
             document.getElementById('editId').value = id || '';
-            document.getElementById('mZone').value = mapZoneKeyForDom(item.zone); 
+            document.getElementById('mZone').value = (item.zone === "冷藏庫-左") ? "冷藏庫-慢" : item.zone; 
             document.getElementById('mFloor').value = item.floor; 
             document.getElementById('mPos').value = item.pos;
             document.getElementById('mName').value = item.name; 
@@ -746,9 +773,13 @@
         function saveData() {
             const id = document.getElementById('editId').value;
             const isReportMode = document.getElementById('reportFields').style.display === 'block';
+            let zVal = document.getElementById('mZone').value;
+            if(zVal === "冷藏庫-慢" || zVal === "冷藏庫-left") zVal = "冷藏庫-左";
+            if(zVal === "冷藏庫-right") zVal = "冷藏庫-右";
+
             const entry = {
                 id: id ? parseInt(id) : Date.now(),
-                zone: document.getElementById('mZone').value, 
+                zone: zVal, 
                 floor: document.getElementById('mFloor').value, 
                 pos: document.getElementById('mPos').value,
                 name: document.getElementById('mName').value, 
@@ -815,41 +846,64 @@
             }
         }
 
-        // 🚀 核心修復：修正 updateStats 內 DOM 選取器與中文字名稱不吻合產生的 BUG
+        // 🎯 已完美修復無顯示庫位（看板顯示 --）的 BUG
         function updateStats() {
-            const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-左", "冷藏庫-右", "常溫區"];
-            zones.forEach(z => {
-                let domZone = z;
-                
-                const cardEl = document.getElementById(`card-${domZone}`);
-                if (closedCards.has(domZone)) { 
+            // 🚀 將這裡的 domId 修改與 HTML 中的真實看板 id 一致
+            const zoneMappings = [
+                { key: "極冷庫-左", domId: "極冷庫-左" },
+                { key: "極冷庫-右", domId: "極冷庫-右" },
+                { key: "冷藏庫-left", domId: "冷藏庫-左" }, // 相容處理
+                { key: "冷藏庫-左", domId: "冷藏庫-left" },   // 真實映射
+                { key: "冷藏庫-右", domId: "冷藏庫-右" },
+                { key: "常溫區", domId: "常溫區" }
+            ];
+
+            const processedDom = new Set();
+
+            zoneMappings.forEach(mapping => {
+                let domKey = mapping.key;
+                if(domKey === "冷藏庫-left") domKey = "冷藏庫-左";
+                if (processedDom.has(domKey)) return;
+                processedDom.add(domKey);
+
+                const cardEl = document.getElementById(`card-${domKey}`);
+                if (closedCards.has(domKey)) { 
                     if (cardEl) cardEl.style.display = 'none'; 
                     return; 
-                } else { 
-                    if (cardEl) cardEl.style.display = 'block'; 
                 }
 
-                let totalOcc = 0; let floorDetails = [];
+                // 🌟 自動獲取對應配置的每層儲位數
+                const slotsPerFloor = ZONE_CONFIG[domKey] || 22;
+                const totalSlotsForZone = slotsPerFloor * 4; 
+
+                let totalOcc = 0; 
+                let floorDetails = [];
+
                 ["1F","2F","3F","4F"].forEach(f => { 
                     let floorOcc = 0;
-                    for(let i=1; i<=22; i++) {
-                        // 確保比對時與原始資料清洗後的區域格式一致
-                        if(inventory.some(x => mapZoneKeyForDom(x.zone) === domZone && x.floor === f && String(x.pos) === String(i))) { 
+                    for(let i = 1; i <= slotsPerFloor; i++) {
+                        if(inventory.some(x => {
+                            const matchZ = x.zone;
+                            const isMatch = (matchZ === domKey || 
+                                            (domKey === "冷藏庫-左" && (matchZ === "冷藏庫-left" || matchZ === "冷藏庫-慢")));
+                            return isMatch && x.floor === f && String(x.pos) === String(i);
+                        })) { 
                             floorOcc++; totalOcc++; 
                         }
                     }
-                    floorDetails.push(`${f}:<span class="stat-num-highlight">${22 - floorOcc}</span>`);
+                    floorDetails.push(`${f}:<span class="stat-num-highlight">${slotsPerFloor - floorOcc}</span>`);
                 });
                 
-                const targetEmptyEl = document.getElementById(`empty-${domZone}`);
-                if(targetEmptyEl) targetEmptyEl.innerText = 88 - totalOcc;
+                // 🎯 修正核心：正確獲取 HTML 中定義的 id 元素
+                const targetEmptyEl = document.getElementById(`empty-${domKey}`);
+                if(targetEmptyEl) targetEmptyEl.innerText = totalSlotsForZone - totalOcc;
                 
-                const detailEl = document.getElementById(`detail-${domZone}`);
+                const detailEl = document.getElementById(`detail-${domKey}`);
                 if(detailEl) {
                     detailEl.innerHTML = floorDetails.join(" | ");
-                    detailEl.style.display = hiddenCardDetails.has(domZone) ? 'none' : 'block';
-                    const arrowEl = document.getElementById(`arrow-${domZone}`);
-                    if(arrowEl) arrowEl.innerText = hiddenCardDetails.has(domZone) ? '▶' : '▼';
+                    detailEl.style.display = hiddenCardDetails.has(domKey) ? 'none' : 'block';
+                    const arrowEl = document.getElementById(`arrow-${domKey}`);
+                    if(arrowEl) arrowEl.innerText = hiddenCardDetails.has(domKey) ? '▶' : '▼';
                 }
             });
         }
@@ -917,7 +971,8 @@
                 let rawZone = String(r[1]||"").trim();
                 if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
                 if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
-                if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-左";
+                if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-慢"; // 保持原廠轉換
+                if(rawZone === "冷藏庫-right") rawZone = "冷藏庫-右";
                 return { 
                     id: Date.now() + i, 
                     zone: rawZone, 
@@ -940,14 +995,14 @@
         function exportExcel() { 
             const cleanInventory = inventory.map(({ fullPos, ...rest }) => rest);
             const ws = XLSX.utils.json_to_sheet(cleanInventory); 
-            const wb = XLSX.utils.book_new(); 
+            const wb = XLSX.book_new(); 
             XLSX.utils.book_append_sheet(wb, ws, "Inventory"); 
             XLSX.writeFile(wb, "Inventory.xlsx"); 
         }
 
         function exportActionLogs() {
             if (actionLogs.length === 0) { alert("目前尚未產生操作軌跡。"); return; }
-            const wb = XLSX.utils.book_new();
+            const wb = XLSX.book_new();
             const wsLogs = XLSX.utils.json_to_sheet(actionLogs);
             wsLogs['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 75 }];
             XLSX.utils.book_append_sheet(wb, wsLogs, "系統操作行為審計");
