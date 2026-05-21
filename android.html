@@ -101,6 +101,34 @@
             td { padding: 12px 15px; text-align: right; border: none !important; position: relative; display: flex; justify-content: space-between; align-items: center; }
             td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; }
         }
+
+
+<style>
+  .btn-main {
+    padding: 20px 80px;
+    border-radius: 50px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease; /* 特效過渡 */
+    text-decoration: none;
+    display: inline-block;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    background-color: #0d9488; /* 主色調 */
+  }
+
+  /* 滑鼠懸停特效 */
+  .btn-main:hover {
+    background-color: #0f766e;
+    transform: translateY(-3px); /* 按鈕浮起 */
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); /* 陰影加深 */
+  }
+
+  /* 按下瞬間的特效 */
+  .btn-main:active {
+    transform: translateY(0);
+  }
+<style>
     </style>
 </head>
 <body>
@@ -111,10 +139,19 @@
 <div id="reportModal" class="modal"><div class="modal-content"><h3 style="color:var(--primary); margin-top:0;">🚩 狀態回報</h3><select id="reportType" class="btn" style="margin-bottom:15px;"><option value="報廢">報廢</option><option value="異常">異常</option><option value="正常">正常</option><option value="移位">移位</option></select><input type="text" id="reportReason" class="btn" placeholder="原因..."><div style="display:flex; gap:12px; margin-top:25px;"><button class="btn-main" style="background:#475569; flex:1;" onclick="closeModal('reportModal')">取消</button><button class="btn-main" style="flex:1;" onclick="submitReport()">提交</button></div></div></div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 10px;">倉儲庫位控管系統 <span style="color:var(--primary)">V20</span></h1>
-    <button class="btn-main" style="padding: 20px 80px; border-radius:50px;" onclick="enterSystem()">啟動系統</button>
-    <a href="https://mingfonglpg-bit.github.io/-1-1/mainofflinesys.html" target="_blank" class="btn-main" style="padding: 20px 80px; border-radius:20px; background:#1e293b; border: 1px solid var(--border); margin-top: 15px;">📴 離線系統</a>
-    <a href="https://mingfonglpg-bit.github.io/-1-1/mobile.html" target="_blank" class="btn-main" style="padding: 20px 80px; border-radius:8px; background:#0f766e; border: 1px solid rgba(255, 255, 255, 0.15); margin-top: 15px;">📱 手機離線系統</a>
+    
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">
+        倉儲庫位控管系統 <span style="color:#0d9488">V20</span>
+    </h1>
+
+    <!-- 啟動系統按鈕 -->
+    <button class="btn-main" onclick="enterSystem()">啟動系統</button>
+    
+    <!-- 手機離線系統按鈕 -->
+    <a href="https://mingfonglpg-bit.github.io/-1-1/mobile.html" target="_blank" class="btn-main" style="margin-top: 15px;">
+        📱 新系統測試
+    </a>
+    
 </div>
 
 <div class="container" id="main-container">
