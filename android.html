@@ -130,12 +130,12 @@
     </header>
 
     <div class="marquee-container">
-        <div class="marquee-text">🔔 系統公告：請務必依貨品原儲位編號進行入庫。26.5.19 update!</div>
+        <div class="marquee-text">🔔 系統公告：請務必依貨品原儲位編號進行入庫。26.5.15 update!</div>
     </div>
  
     <div id="admin-panel" style="display:none; background:rgba(99,102,241,0.05); padding:20px; border-radius:24px; border:1px solid var(--primary); margin-bottom:25px;">
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
-            <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-right</option><option value="常溫區">常溫區</option></select>
+            <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
             <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             <input type="number" id="addPos" placeholder="儲位" class="btn"><input type="text" id="addName" placeholder="產品" class="btn"><input type="text" id="addBatch" placeholder="批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn"><button onclick="commitAdd()" class="btn-main">➕ 入庫</button>
         </div>
@@ -145,7 +145,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <b id="mapTitle" style="color:var(--primary);">載入中...</b>
             <div style="display:flex; gap:8px;">
-                <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-專用</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+                <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
                 <select id="vFloor" onchange="renderVisual()" class="btn" style="width:75px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
         </div>
