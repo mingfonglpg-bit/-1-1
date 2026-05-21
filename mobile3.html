@@ -180,6 +180,10 @@
         </div>
     </div>
 
+<div style="margin: 0 12px 12px 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 5px; color: #fbbf24; font-size: 13px; backdrop-filter: blur(8px);">
+    <marquee scrollamount="4">⚡ 系統提示：最後更新日: 26.5.21</marquee>
+</div>
+
     <div class="nav-control">
         <select id="vZone" onchange="renderAll()">
             <option value="極冷庫-左">❄️ 極冷庫-左</option>
@@ -597,6 +601,7 @@
                     <div style="display:flex; justify-content:flex-end; gap:2px; margin-top:4px;">
                         <button class="action-btn" style="background:var(--restock)" onclick="findRestock('${i.id}')">🔍 補貨</button>
                         <button class="action-btn" style="background:#4b5563" onclick="openBox('report', '${i.id}')">回報</button>
+                        <button class="action-btn" style="background:#f59e0b" onclick="window.location.href='https://mingfonglpg-bit.github.io/-/count.html?search=${encodeURIComponent(i.name)}'">查</button>
                         ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', '${i.id}')">✎</button>
                         <button class="action-btn" style="background:var(--danger)" onclick="deleteItem('${i.id}')">🗑️</button>` : ''}
                     </div>
