@@ -31,11 +31,6 @@
         .btn-main:active { transform: scale(0.95); opacity: 0.9; }
         .btn-main.active { background: #4f46e5; box-shadow: 0 0 12px rgba(99, 102, 241, 0.5); }
         
-        /* 📢 跑馬燈樣式 */
-        .marquee-wrapper { background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border); padding: 6px 12px; margin-bottom: 12px; overflow: hidden; display: flex; align-items: center; }
-        .marquee-content { display: inline-block; white-space: nowrap; font-size: 13px; font-weight: bold; color: var(--warning); animation: marquee 12s linear infinite; }
-        @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
-
         .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
         .stat-card { background: var(--card-bg); border-radius: 12px; padding: 10px 12px; border: 1px solid var(--border); position: relative; cursor: pointer; transition: transform 0.2s; }
         .stat-card:active { transform: scale(0.98); }
@@ -83,6 +78,7 @@
         .table-view tr.row-selected { background: rgba(168, 85, 247, 0.15) !important; border-left: 3px solid var(--marked); }
         
         .card-view { display: flex; flex-direction: column; gap: 8px; }
+        /* ⚠️ 修復：加入 touch-action: pan-y 讓左右滑動判定更精準且不影響上下捲動 */
         .info-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: transform 0.2s, opacity 0.2s; will-change: transform, opacity; overflow: hidden; touch-action: pan-y; }
         .info-card.card-selected { border-color: var(--marked); background: rgba(168, 85, 247, 0.08); box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
         .info-card.swiped-out { transform: translateX(100%) !important; opacity: 0 !important; }
@@ -122,15 +118,10 @@
 <body>
 
     <div class="header">
-        <div style="display:flex; gap:6px; overflow-x: auto; white-space: nowrap;">
+        <div style="display:flex; gap:6px;">
             <button id="adminLoginBtn" class="btn-main" style="background:#334155" onclick="adminLogin()">🔐 管理模式</button>
             <button id="adminPanelBtn" class="btn-main" style="background:#475569;" onclick="toggleAdminPanel()">⚙️ 工具</button>
-            <button id="themeBtn" class="btn-main" style="background:#db2777;" onclick="alert('🎨 版面配色功能準備中！後續可替換此按鈕邏輯。')">🎨 配色</button>
         </div>
-    </div>
-
-    <div class="marquee-wrapper">
-        <div class="marquee-content">📢 系統最新公告：最後更新日: 26.05.21 ⚡</div>
     </div>
 
     <div id="admin-panel" class="admin-panel">
@@ -542,6 +533,7 @@
                 filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
             }
             
+            // ⚠️ 修復：統一轉為字串判斷，解決因 ID 型別（數字或字串）不同造成的過濾失效
             filtered = filtered.filter(x => !swipedCardIds.has(String(x.id)));
             
             if (currentSort.key) {
@@ -640,7 +632,7 @@
             renderAll();
         }
 
-       // 🚀 滑動事件修訂：針對區域動態指派跳轉邏輯
+       // ⚠️ 修復：精準實踐左滑隱藏、右滑跳轉
        function bindSwipeEvents() {
             const cards = document.querySelectorAll('.info-card');
             cards.forEach(card => {
@@ -675,45 +667,33 @@
 
                     // 判斷滑動距離
                     if (Math.abs(moveX) > 100) {
-                        const itemId = String(card.getAttribute('data-id'));
+                        const itemId = String(card.getAttribute('data-id')); // 確保為字串型別
                         const itemData = inventory.find(x => String(x.id) === itemId);
 
                         if (moveX > 0) {
-                            // 🚀 向右滑動：跳轉查詢
+                            // 🚀 向右滑動：跳轉並帶入參數
                             if (itemData && itemData.name) {
-                                const zoneStr = String(itemData.zone || "");
+                                // 顯示提示
+                                showToast("🔍 查詢庫存中...", 2000);
                                 
-                                // 🚧 攔截冷藏庫-右
-                                if (zoneStr === "冷藏庫-右") {
-                                    alert("🚧 冷藏庫-右：未來網頁專區規劃中，保留此升級代碼！");
-                                    card.style.transform = '';
-                                    card.style.opacity = '1';
-                                } else {
-                                    showToast("🔍 查詢庫存中...", 2000);
-                                    let searchUrl = "";
-                                    
-                                    // 依據冷凍或冷藏給予不同跳轉頁面 (可在此自定義)
-                                    if (zoneStr.includes("極冷") || zoneStr.includes("冷凍")) {
-                                        searchUrl = `https://mingfonglpg-bit.github.io/-/count-freeze.html?search=${encodeURIComponent(itemData.name)}`;
-                                    } else if (zoneStr.includes("冷藏")) {
-                                        searchUrl = `https://mingfonglpg-bit.github.io/-/count-chill.html?search=${encodeURIComponent(itemData.name)}`;
-                                    } else {
-                                        // 預設 (常溫區)
-                                        searchUrl = `https://mingfonglpg-bit.github.io/-/count.html?search=${encodeURIComponent(itemData.name)}`;
-                                    }
-                                    
-                                    setTimeout(() => { window.location.href = searchUrl; }, 500);
-                                }
+                                // 組合 URL
+                                const searchUrl = `https://mingfonglpg-bit.github.io/-/count.html?search=${encodeURIComponent(itemData.name)}`;
+                                
+                                // 延遲跳轉以確保使用者能看到提示
+                                setTimeout(() => {
+                                    window.location.href = searchUrl;
+                                }, 500);
                             } else {
+                                // 若無品名則彈回
                                 card.style.transform = '';
                                 card.style.opacity = '1';
                             }
                         } else {
-                            // ⬅️ 向左滑動：移除字卡
+                            // ⬅️ 向左滑動：移除字卡（僅視覺上消失，資料不刪除）
                             card.classList.add('swiped-out', 'swiped-out-left');
                             setTimeout(() => {
-                                swipedCardIds.add(itemId); 
-                                renderTable(); 
+                                swipedCardIds.add(itemId); // 寫入隱藏清單
+                                renderTable(); // 重新渲染列表
                             }, 200);
                         }
                     } else {
