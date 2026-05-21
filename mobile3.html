@@ -13,6 +13,13 @@
             --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
             --color-cold: #3b82f6; --color-chill: #0ea5e9; --color-ambient: #94a3b8;
             --stat-num: #fbbf24;
+
+            /* 🚀 優化後的視覺化網格專用高對比配色 */
+            --slot-occupied: #4338ca;
+            --slot-warning: #b45309;
+            --slot-danger: #991b1b;
+            --slot-task: #065f46;
+            --slot-marked: #6b21a8;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         body { background-color: var(--bg); color: var(--text-main); padding: 12px; font-size: 14px; padding-bottom: 60px; overflow-x: hidden; }
@@ -37,20 +44,29 @@
         .nav-control { display: flex; gap: 6px; margin-bottom: 12px; background: var(--card-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; white-space: nowrap; }
         .nav-control select { background: #334155; color: #fff; border: 1px solid var(--border); padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; outline: none; }
         
+        /* 🚀 儲位格配色樣式重構（增強黑暗模式對比度與質感） */
         .visual-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; }
-        .slot { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; height: 48px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: 700; color: var(--text-dim); position: relative; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+        .slot { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; height: 48px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; font-weight: 700; color: var(--text-dim); position: relative; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
         .slot div { font-size: 15px; }
-        .slot.occupied { background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #fff; }
-        .slot.occupied::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; }
+        
+        /* 正常有存貨：飽和靛藍 */
+        .slot.occupied { background: var(--slot-occupied); border-color: #818cf8; color: #fff; }
+        .slot.occupied::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; }
         .slot.has-note::after { background: #22d3ee !important; width: 7px; height: 7px; }
-        .slot.status-warning { background: rgba(245, 158, 11, 0.2) !important; border-color: var(--warning) !important; color: var(--warning) !important; }
-        .slot.status-danger { background: rgba(239, 68, 68, 0.25) !important; border-color: var(--danger) !important; color: var(--danger) !important; }
-        .slot.status-task { background: rgba(217, 249, 157, 0.25) !important; border-color: #a3e635 !important; color: #d9f99d !important; }
-        .slot.status-marked { background: rgba(168, 85, 247, 0.3) !important; border-color: var(--marked) !important; color: #e9d5ff !important; box-shadow: inset 0 0 6px rgba(168, 85, 247, 0.5); }
+        
+        /* 效期急件：琥珀橘 */
+        .slot.status-warning { background: var(--slot-warning) !important; border-color: #fb923c !important; color: #ffedd5 !important; }
+        /* 報廢/過期危險：深警示紅 */
+        .slot.status-danger { background: var(--slot-danger) !important; border-color: #f87171 !important; color: #fee2e2 !important; }
+        /* 盤點/異動任務：現場深綠 */
+        .slot.status-task { background: var(--slot-task) !important; border-color: #34d399 !important; color: #ecfdf5 !important; }
+        /* 標記篩選：霓虹深紫 */
+        .slot.status-marked { background: var(--slot-marked) !important; border-color: #c084fc !important; color: #f3e8ff !important; box-shadow: inset 0 0 8px rgba(168, 85, 247, 0.6); }
+        
         .slot:active { transform: scale(0.92); background: rgba(255,255,255,0.1); }
         
-        .focus-warning .slot:not(.status-warning) { opacity: 0.3; }
-        .focus-marked .slot:not(.status-marked) { opacity: 0.3; }
+        .focus-warning .slot:not(.status-warning) { opacity: 0.2; }
+        .focus-marked .slot:not(.status-marked) { opacity: 0.2; }
         
         .search-box { display: flex; gap: 6px; margin-bottom: 12px; position: relative; }
         .search-box input { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 14px; outline: none; backdrop-filter: blur(8px); }
@@ -127,7 +143,7 @@
     </div>
 
     <div class="dashboard">
-        <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
+        <div class="stat-card" id="card-極冷庫-慢" onclick="toggleCardDetail('極冷庫-左')">
             <div class="stat-label">
                 <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
@@ -143,9 +159,9 @@
             <div id="empty-極冷庫-右" class="stat-value">--</div>
             <div id="detail-極冷庫-右" class="stat-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
+        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-left')">
             <div class="stat-label">
-                <span>🍏冷藏庫-右 <span id="arrow-冷藏庫-左">▼</span></span>
+                <span>🍏 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
             </div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
@@ -156,7 +172,7 @@
                 <span>🍏 冷藏庫-右 <span id="arrow-冷藏庫-右">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
             </div>
-            <div id="empty-冷藏庫-right" class="stat-value">--</div>
+            <div id="empty-冷藏庫-右" class="stat-value">--</div>
             <div id="detail-冷藏庫-右" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
@@ -171,9 +187,9 @@
 
     <div class="nav-control">
         <select id="vZone" onchange="renderAll()">
-            <option value="極冷庫-左">❄️極冷庫-左</option>
+            <option value="極冷庫-左">❄️ 極冷庫-左</option>
             <option value="極冷庫-右">❄️ 極冷庫-右</option>
-            <option value="冷藏庫-左">🍏冷藏庫-左</option>
+            <option value="冷藏庫-左">🍏 冷藏庫-左</option>
             <option value="冷藏庫-右">🍏 冷藏庫-右</option>
             <option value="常溫區">📦 常溫區</option>
         </select>
@@ -359,7 +375,6 @@
         async function enterSystem() {
             showToast("☁️ 正在連線下載雲端庫存...", 0);
             try {
-                // 💡 優化點：GET 請求加上防快取機制
                 const response = await fetch(`${SCRIPT_URL}?action=read&_t=${Date.now()}`);
                 if (!response.ok) throw new Error("連線錯誤");
                 const resData = await response.json();
@@ -395,11 +410,9 @@
             }
         }
 
-        // 💡 核心修復：重構雲端資料同步函數，改採相容性最高、最穩定的 URLSearchParams 格式
         async function syncToCloud(actionType, entryData) {
             showToast("☁️ 雲端同步中...", 0);
             try {
-                // 將資料結構轉換為標準的表單傳輸，保證行動端與跨網域的 `no-cors` 指令能被後端 100% 讀取
                 const params = new URLSearchParams();
                 params.append("action", actionType);
                 params.append("data", JSON.stringify(entryData));
@@ -660,6 +673,15 @@
             if(cardEl) cardEl.style.display = 'none';
         }
 
+        // 🚀 修正點：防呆防錯字機制
+        function mapZoneKeyForDom(z) {
+            if (z === "極冷庫-左") return "極冷庫-左";
+            if (z === "極冷庫-右") return "極冷庫-右";
+            if (z === "冷藏庫-左" || z === "冷藏庫-left") return "冷藏庫-左";
+            if (z === "冷藏庫-右" || z === "冷藏庫-right") return "冷藏庫-右";
+            return "常溫區";
+        }
+
         function toggleWarningMode() { 
             isWarningMode = !isWarningMode; 
             const btn = document.getElementById('warningBtn');
@@ -706,8 +728,12 @@
             const item = id ? inventory.find(x => x.id === id) : {zone:document.getElementById('vZone').value, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
             document.getElementById('itemModal').style.display = 'block';
             document.getElementById('editId').value = id || '';
-            document.getElementById('mZone').value = item.zone; document.getElementById('mFloor').value = item.floor; document.getElementById('mPos').value = item.pos;
-            document.getElementById('mName').value = item.name; document.getElementById('mBatch').value = item.batch; document.getElementById('mDate').value = item.date;
+            document.getElementById('mZone').value = mapZoneKeyForDom(item.zone); 
+            document.getElementById('mFloor').value = item.floor; 
+            document.getElementById('mPos').value = item.pos;
+            document.getElementById('mName').value = item.name; 
+            document.getElementById('mBatch').value = item.batch; 
+            document.getElementById('mDate').value = item.date;
             document.getElementById('mNote').value = item.note || "";
             const isReport = (type === 'report');
             document.getElementById('mPos').readOnly = isReport;
@@ -789,11 +815,12 @@
             }
         }
 
-        // 💡 修正點：全量移除錯字（如 冷藏庫-開、極冷庫-開、detail-冷藏庫-left），與 DOM 完全對齊，防止 JS 執行阻斷
+        // 🚀 核心修復：修正 updateStats 內 DOM 選取器與中文字名稱不吻合產生的 BUG
         function updateStats() {
             const zones = ["極冷庫-左", "極冷庫-右", "冷藏庫-左", "冷藏庫-右", "常溫區"];
             zones.forEach(z => {
                 let domZone = z;
+                
                 const cardEl = document.getElementById(`card-${domZone}`);
                 if (closedCards.has(domZone)) { 
                     if (cardEl) cardEl.style.display = 'none'; 
@@ -806,7 +833,8 @@
                 ["1F","2F","3F","4F"].forEach(f => { 
                     let floorOcc = 0;
                     for(let i=1; i<=22; i++) {
-                        if(inventory.some(x => x.fullPos === `${domZone}${f}-${i}`)) { 
+                        // 確保比對時與原始資料清洗後的區域格式一致
+                        if(inventory.some(x => mapZoneKeyForDom(x.zone) === domZone && x.floor === f && String(x.pos) === String(i))) { 
                             floorOcc++; totalOcc++; 
                         }
                     }
