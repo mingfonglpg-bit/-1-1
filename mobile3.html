@@ -59,7 +59,6 @@
         
         .slot:active { transform: scale(0.92); background: rgba(255,255,255,0.1); }
         
-        /* 連動新增的效期聚焦透明度樣式 */
         .focus-warning .slot:not(.status-warning) { opacity: 0.2; }
         .focus-marked .slot:not(.status-marked) { opacity: 0.2; }
         
@@ -151,24 +150,24 @@
                 <span>❄️ 極冷庫-右 <span id="arrow-極冷庫-右">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-右')">×</button>
             </div>
-            <div id="empty-極冷庫-右" class="stat-value">--</div>
-            <div id="detail-極冷庫-右" class="stat-detail"></div>
+            <div id="empty-極冷庫-right" class="stat-value">--</div>
+            <div id="detail-極冷庫-right" class="stat-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
+        <div class="stat-card" id="card-冷藏庫-left" onclick="toggleCardDetail('冷藏庫-left')">
             <div class="stat-label">
-                <span>🍏 冷藏庫-左 <span id="arrow-冷藏庫-左">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
+                <span>🍏 冷藏庫-左 <span id="arrow-冷藏庫-left">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-left')">×</button>
             </div>
             <div id="empty-冷藏庫-慢" class="stat-value">--</div> 
-            <div id="detail-冷藏庫-左" class="stat-detail"></div>
+            <div id="detail-冷藏庫-left" class="stat-detail"></div>
         </div>
-        <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
+        <div class="stat-card" id="card-冷藏庫-right" onclick="toggleCardDetail('冷藏庫-right')">
             <div class="stat-label">
-                <span>🍏 冷藏庫-右<span id="arrow-冷藏庫-右">▼</span></span>
-                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-右')">×</button>
+                <span>🍏 冷藏庫-右<span id="arrow-冷藏庫-right">▼</span></span>
+                <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-right')">×</button>
             </div>
-            <div id="empty-冷藏庫-右" class="stat-value">--</div> 
-            <div id="detail-冷藏庫-右" class="stat-detail"></div>
+            <div id="empty-冷藏庫-right" class="stat-value">--</div> 
+            <div id="detail-冷藏庫-right" class="stat-detail"></div>
         </div>
         <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
             <div class="stat-label">
@@ -251,7 +250,7 @@
                         <select id="mZone">
                             <option value="極冷庫-左">極冷庫-左</option>
                             <option value="極冷庫-右">極冷庫-右</option>
-                            <option value="冷藏庫-慢">冷藏庫-左</option>
+                            <option value="冷藏庫-左">冷藏庫-左</option>
                             <option value="冷藏庫-右">冷藏庫-右</option>
                             <option value="常溫區">常溫區</option>
                         </select>
@@ -329,7 +328,6 @@
 
         let inventory = [];
         let isWarningMode = false, isMarkMode = false, isAdmin = false;
-        // 🎯 重點改動：定義效期篩選狀態變數 (0表示關閉, 30或60表示啟用對應天數篩選)
         let expiryFilterDays = 0; 
         let markedPos = new Set();
         let currentSort = { key: '', order: 1 };
@@ -379,7 +377,6 @@
             return 0;
         }
 
-        // 🎯 重點改動：輔助函式計算剩餘有效天數
         function getDiffDays(dateStr) {
             if (!dateStr || dateStr === "-") return 999;
             return Math.ceil((new Date(dateStr) - new Date().setHours(0,0,0,0)) / 86400000);
@@ -392,15 +389,19 @@
                 if (!response.ok) throw new Error("連線錯誤");
                 const resData = await response.json();
                 if (resData.status === "success") {
-                    inventory = resData.data.map(item => {
+                    // 🎯 修正: 確保每筆資料有唯一 ID，防止抓錯對應資料
+                    inventory = resData.data.map((item, index) => {
                         let rawZone = String(item.zone || "").trim();
                         if(rawZone === "冷藏庫-慢" || rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
                         if(rawZone === "冷藏庫-right") rawZone = "冷藏庫-右";
+                        if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
+                        
                         const rawFloor = String(item.floor || "").trim();
                         const rawPos = String(item.pos || "").trim();
+                        
                         return {
                             ...item,
-                            id: parseInt(item.id) || Date.now(),
+                            id: item.id ? item.id : (Date.now() + index),
                             zone: rawZone,
                             floor: rawFloor,
                             pos: rawPos,
@@ -447,21 +448,16 @@
 
         function renderVisual() {
             let z = document.getElementById('vZone').value, f = document.getElementById('vFloor').value;
-            if(z === "冷藏庫-慢" || z === "冷藏庫-left") z = "冷藏庫-開"; // 相容舊對應
-            if(z === "冷藏庫-左") z = "冷藏庫-左";
-            if(z === "冷藏庫-右") z = "冷藏庫-右";
-
             const grid = document.getElementById('visualGrid'); 
             grid.innerHTML = '';
             
-            // 🎯 重點改動：如果是效期篩選模式，同樣加上高對比聚焦 css 類別控制透明度
             const isAnyMarkActive = isMarkMode || (expiryFilterDays > 0);
             grid.className = 'visual-grid' + (isWarningMode ? ' focus-warning' : '') + (isAnyMarkActive ? ' focus-marked' : '');
             
-            const maxSlots = ZONE_CONFIG[document.getElementById('vZone').value] || 22; 
+            const maxSlots = ZONE_CONFIG[z] || 22; 
             
             for (let i = 1; i <= maxSlots; i++) {
-                const full = `${document.getElementById('vZone').value}${f}-${i}`;
+                const full = `${z}${f}-${i}`;
                 const items = inventory.filter(x => x.fullPos === full);
                 const slot = document.createElement('div');
                 slot.className = 'slot'; 
@@ -475,7 +471,6 @@
                     else if (s.includes(1)) slot.classList.add('status-warning');
                     if (items.some(x => (x.note && x.note.trim() !== ""))) slot.classList.add('has-note');
 
-                    // 🎯 重點改動：檢查是否符合30天或60天到期條件
                     if (expiryFilterDays === 30) {
                         isExpiryMatch = items.some(x => {
                             const diff = getDiffDays(x.date);
@@ -484,12 +479,11 @@
                     } else if (expiryFilterDays === 60) {
                         isExpiryMatch = items.some(x => {
                             const diff = getDiffDays(x.date);
-                            return diff > 30 && diff <= 60; // 完美剔除30天以內
+                            return diff > 30 && diff <= 60;
                         });
                     }
                 }
 
-                // 🎯 重點改動：如果被手動標記 OR 符合新版效期篩選，該庫位套用變色
                 if (markedPos.has(full) || isExpiryMatch) {
                     slot.classList.add('status-marked');
                 }
@@ -518,13 +512,11 @@
             if (isWarningMode) {
                 filtered = inventory.filter(x => checkDateStatus(x) === 1);
             } else if (expiryFilterDays === 30 && kw === '') {
-                // 🎯 重點改動：30天到期模式下資料列表連動篩選
                 filtered = inventory.filter(x => {
                     const diff = getDiffDays(x.date);
                     return diff >= 0 && diff <= 30;
                 });
             } else if (expiryFilterDays === 60 && kw === '') {
-                // 🎯 重點改動：60天到期模式下資料列表連動篩選 (排除30天內)
                 filtered = inventory.filter(x => {
                     const diff = getDiffDays(x.date);
                     return diff > 30 && diff <= 60;
@@ -538,8 +530,6 @@
                 filtered = inventory.filter(x => (x.fullPos + x.name + x.batch + (x.note || "")).toLowerCase().includes(kw));
             } else {
                 let cz = document.getElementById('vZone').value, cf = document.getElementById('vFloor').value;
-                if(cz === "冷藏庫-慢" || cz === "冷藏庫-left") cz = "冷藏庫-左";
-                if(cz === "冷藏庫-right") cz = "冷藏庫-右";
                 filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
             }
             
@@ -566,6 +556,7 @@
                 document.getElementById('cardViewContainer').classList.remove('in-mark-mode');
             }
 
+            // 🎯 修正: 將傳入 onclick 的 ${i.id} 加上單引號，保證無論 ID 是字串還是數字都能準確對應
             tableContainer.innerHTML = data.map(i => {
                 const s = checkDateStatus(i);
                 const isScrapped = (s === 3); 
@@ -578,14 +569,15 @@
                     <td style="${s===1?'color:var(--warning);font-weight:bold':(s===2?'color:var(--danger);font-weight:bold':'')}">${i.date}</td>
                     <td class="${isScrapped ? 'scrapped-text' : ''}" style="${s===3?'color:var(--danger);font-weight:bold':(s===4?'color:var(--task-color);font-weight:bold':'')}">${i.note || "-"}</td>
                     <td>
-                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock(${i.id})">🔍 補貨</button>
-                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', ${i.id})">回報</button>
-                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', ${i.id})">✎</button>
-                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem(${i.id})">🗑️</button>` : ''}
+                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock('${i.id}')">🔍 補貨</button>
+                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', '${i.id}')">回報</button>
+                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', '${i.id}')">✎</button>
+                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem('${i.id}')">🗑️</button>` : ''}
                     </td>
                 </tr>`;
             }).join('');
 
+            // 🎯 修正: 將手機版字卡傳入 onclick 的 ${i.id} 加上單引號
             listContainer.innerHTML = data.map(i => {
                 const s = checkDateStatus(i);
                 const isScrapped = (s === 3); 
@@ -604,10 +596,10 @@
                         備註說明: <span style="${s===3?'color:var(--danger);font-weight:bold':(s===4?'color:var(--task-color);font-weight:bold':'')}">${i.note || "-"}</span>
                     </div>
                     <div style="display:flex; justify-content:flex-end; gap:2px; margin-top:4px;">
-                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock(${i.id})">🔍 補貨</button>
-                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', ${i.id})">回報</button>
-                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', ${i.id})">✎</button>
-                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem(${i.id})">🗑️</button>` : ''}
+                        <button class="action-btn" style="background:var(--restock)" onclick="findRestock('${i.id}')">🔍 補貨</button>
+                        <button class="action-btn" style="background:#4b5563" onclick="openBox('report', '${i.id}')">回報</button>
+                        ${isAdmin ? `<button class="action-btn" style="background:var(--edit)" onclick="openBox('edit', '${i.id}')">✎</button>
+                        <button class="action-btn" style="background:var(--danger)" onclick="deleteItem('${i.id}')">🗑️</button>` : ''}
                     </div>
                 </div>`;
             }).join('');
@@ -621,14 +613,12 @@
             bindSwipeEvents();
         }
 
-        // 🎯 重點改動：新增效期控制按鈕點擊切換邏輯
         function toggleExpiryFilterMode(days) {
             if (expiryFilterDays === days) {
-                expiryFilterDays = 0; // 如果重複點擊則取消篩選
+                expiryFilterDays = 0; 
                 document.getElementById(`expiry${days}Btn`).classList.remove('active');
             } else {
                 expiryFilterDays = days;
-                // 清除其他互斥按鈕狀態
                 isWarningMode = false;
                 isMarkMode = false;
                 document.getElementById('warningBtn').classList.remove('active');
@@ -636,7 +626,6 @@
                 document.getElementById('expiry30Btn').classList.remove('active');
                 document.getElementById('expiry60Btn').classList.remove('active');
                 
-                // 激活當前按鈕
                 document.getElementById(`expiry${days}Btn`).classList.add('active');
                 logAction("效期篩選", `使用者查看 ${days} 天內到期品項網格`);
             }
@@ -711,12 +700,12 @@
         }
 
         function findRestock(id) {
-            const currentItem = inventory.find(x => x.id === id);
+            const currentItem = inventory.find(x => String(x.id) === String(id));
             if (!currentItem || !currentItem.name) return;
             const currentZoneType = currentItem.zone.split('-')[0];
             const matches = inventory.filter(x => {
                 const matchZoneType = x.zone.split('-')[0];
-                return x.name === currentItem.name && x.id !== id && matchZoneType === currentZoneType;
+                return x.name === currentItem.name && String(x.id) !== String(id) && matchZoneType === currentZoneType;
             });
             if (matches.length > 0) {
                 const posList = matches.map(x => x.fullPos).join(', ');
@@ -733,28 +722,18 @@
 
         function toggleCardDetail(zoneName) {
             let key = zoneName;
-            if(key === "冷藏庫-left") key = "冷藏庫-左";
-            if(key === "冷藏庫-right") key = "冷藏庫-右";
-            const arrowEl = document.getElementById(`arrow-${zoneName}`);
-            const detailEl = document.getElementById(`detail-${zoneName}`);
             if (hiddenCardDetails.has(key)) {
                 hiddenCardDetails.delete(key);
-                if(detailEl) detailEl.style.display = 'block';
-                if(arrowEl) arrowEl.innerText = '▼';
             } else {
                 hiddenCardDetails.add(key);
-                if(detailEl) detailEl.style.display = 'none';
-                if(arrowEl) arrowEl.innerText = '▶';
             }
+            updateStats();
         }
 
         function closeStatCard(event, id) {
             event.stopPropagation();
-            const cardEl = document.getElementById(`card-${id}`) || event.currentTarget.closest('.stat-card');
-            if(cardEl) {
-                cardEl.style.display = 'none';
-                closedCards.add(id);
-            }
+            closedCards.add(id);
+            updateStats();
         }
 
         function toggleWarningMode() { 
@@ -763,7 +742,7 @@
             if (isWarningMode) {
                 btn.classList.add('active');
                 isMarkMode = false; 
-                expiryFilterDays = 0; // 互斥關閉
+                expiryFilterDays = 0; 
                 document.getElementById('markBtn').classList.remove('active');
                 document.getElementById('expiry30Btn').classList.remove('active');
                 document.getElementById('expiry60Btn').classList.remove('active');
@@ -780,7 +759,7 @@
             if (isMarkMode) { 
                 btn.classList.add('active');
                 isWarningMode = false; 
-                expiryFilterDays = 0; // 互斥關閉
+                expiryFilterDays = 0; 
                 document.getElementById('warningBtn').classList.remove('active');
                 document.getElementById('expiry30Btn').classList.remove('active');
                 document.getElementById('expiry60Btn').classList.remove('active');
@@ -793,35 +772,52 @@
         }
         
         function deleteItem(id) { 
-            const target = inventory.find(x => x.id === id);
+            const target = inventory.find(x => String(x.id) === String(id));
             if(!target) return;
             if(confirm("確定刪除此儲位資料並即時同步至雲端？")) { 
                 logAction("刪除", `移除儲位貨品數據 -> 儲位: ${target.fullPos} | 品名: [${target.name || '無'}]`);
                 
                 syncToCloud("delete", { id: id });
 
-                inventory = inventory.filter(x => x.id !== id); 
+                inventory = inventory.filter(x => String(x.id) !== String(id)); 
                 saveDataLocalOnly(); 
             } 
         }
         
+        /* 🎯 徹底修正：解決回報/編輯視窗抓錯資料、重置下拉選單的問題 */
         function openBox(type, id) {
             let zVal = document.getElementById('vZone').value;
-            if(zVal === "冷藏庫-慢" || zVal === "冷藏庫-left") zVal = "冷藏庫-左";
-            if(zVal === "冷藏庫-right") zVal = "冷藏庫-右";
+            let fVal = document.getElementById('vFloor').value;
 
-            const item = id ? inventory.find(x => x.id === id) : {zone:zVal, floor:document.getElementById('vFloor').value, pos:'', name:'', batch:'', date:'', note:''};
+            let item = null;
+            if (id !== undefined && id !== null && id !== '') {
+                // 強制採用字串比對，解決型別錯誤導致抓不到的問題
+                item = inventory.find(x => String(x.id) === String(id));
+            }
+
+            if (!item) {
+                item = {zone: zVal, floor: fVal, pos: '', name: '', batch: '', date: '', note: ''};
+            }
+
             document.getElementById('itemModal').style.display = 'block';
-            document.getElementById('editId').value = id || '';
-            document.getElementById('mZone').value = (item.zone === "冷藏庫-左") ? "冷藏庫-慢" : item.zone; 
+            document.getElementById('editId').value = item.id || '';
+            
+            // 寫入當前字卡正確的資料
+            document.getElementById('mZone').value = item.zone; 
             document.getElementById('mFloor').value = item.floor; 
             document.getElementById('mPos').value = item.pos;
             document.getElementById('mName').value = item.name; 
             document.getElementById('mBatch').value = item.batch; 
             document.getElementById('mDate').value = item.date;
             document.getElementById('mNote').value = item.note || "";
+            
             const isReport = (type === 'report');
+            
+            // 禁用/啟用下拉選單，避免回報模式使用者誤觸改變原本正確的庫位
+            document.getElementById('mZone').disabled = isReport;
+            document.getElementById('mFloor').disabled = isReport;
             document.getElementById('mPos').readOnly = isReport;
+            
             document.getElementById('editFields').style.display = isReport ? 'none' : 'block';
             document.getElementById('reportFields').style.display = isReport ? 'block' : 'none';
             document.getElementById('modalTitle').innerText = (type==='edit'?'編輯資料':(type==='add'?'手動新增儲位':'異常回報'));
@@ -831,9 +827,12 @@
         function saveData() {
             const id = document.getElementById('editId').value;
             const isReportMode = document.getElementById('reportFields').style.display === 'block';
+            
+            // 存檔前必須解除 disabled 狀態，否則 JS 抓不到 .value 的值
+            document.getElementById('mZone').disabled = false;
+            document.getElementById('mFloor').disabled = false;
+            
             let zVal = document.getElementById('mZone').value;
-            if(zVal === "冷藏庫-慢" || zVal === "冷藏庫-left") zVal = "冷藏庫-左";
-            if(zVal === "冷藏庫-right") zVal = "冷藏庫-右";
 
             const entry = {
                 id: id ? parseInt(id) : Date.now(),
@@ -864,7 +863,7 @@
             logAction(logType, logDetail);
 
             if(id) {
-                let index = inventory.findIndex(x=>x.id==id);
+                let index = inventory.findIndex(x => String(x.id) === String(id));
                 if(index !== -1) inventory[index] = entry;
             } else {
                 inventory.push(entry);
@@ -904,29 +903,25 @@
             }
         }
 
+        /* 🔒 儀表板看板加固：不變動任何看板 HTML，底層映射防錯處理 */
         function updateStats() {
-            const zoneMappings = [
-                { key: "極冷庫-左", domId: "極冷庫-左" },
-                { key: "極冷庫-右", domId: "極冷庫-右" },
-                { key: "冷藏庫-左", domId: "冷藏庫-慢" },
-                { key: "冷藏庫-右", domId: "冷藏庫-右" },
-                { key: "常溫區", domId: "常溫區" }
+            const zones = [
+                { card: "極冷庫-左", actualKey: "極冷庫-左", empty: "極冷庫-左", detail: "極冷庫-左", arrow: "極冷庫-左" },
+                { card: "極冷庫-右", actualKey: "極冷庫-右", empty: "極冷庫-right", detail: "極冷庫-right", arrow: "極冷庫-右" },
+                { card: "冷藏庫-left", actualKey: "冷藏庫-左", empty: "冷藏庫-慢", detail: "冷藏庫-left", arrow: "冷藏庫-left" },
+                { card: "冷藏庫-right", actualKey: "冷藏庫-右", empty: "冷藏庫-right", detail: "冷藏庫-right", arrow: "冷藏庫-right" },
+                { card: "常溫區", actualKey: "常溫區", empty: "常溫區", detail: "常溫區", arrow: "常溫區" }
             ];
 
-            const processedDom = new Set();
-
-            zoneMappings.forEach(mapping => {
-                const domKey = mapping.key;
-                if (processedDom.has(domKey)) return;
-                processedDom.add(domKey);
-
-                const cardEl = document.getElementById(`card-${domKey}`);
-                if (closedCards.has(domKey)) { 
+            zones.forEach(z => {
+                const cardEl = document.getElementById(`card-${z.card}`);
+                
+                if (closedCards.has(z.card)) { 
                     if (cardEl) cardEl.style.display = 'none'; 
                     return; 
                 }
 
-                const slotsPerFloor = ZONE_CONFIG[domKey] || 22;
+                const slotsPerFloor = ZONE_CONFIG[z.actualKey] || 22;
                 const totalSlotsForZone = slotsPerFloor * 4; 
 
                 let totalOcc = 0; 
@@ -935,26 +930,22 @@
                 ["1F","2F","3F","4F"].forEach(f => { 
                     let floorOcc = 0;
                     for(let i = 1; i <= slotsPerFloor; i++) {
-                        if(inventory.some(x => {
-                            const matchZ = x.zone;
-                            const isMatch = (matchZ === domKey);
-                            return isMatch && x.floor === f && String(x.pos) === String(i);
-                        })) { 
+                        if(inventory.some(x => x.zone === z.actualKey && x.floor === f && String(x.pos) === String(i))) { 
                             floorOcc++; totalOcc++; 
                         }
                     }
                     floorDetails.push(`${f}:<span class="stat-num-highlight">${slotsPerFloor - floorOcc}</span>`);
                 });
                 
-                const targetEmptyEl = document.getElementById(`empty-${mapping.domId}`);
+                const targetEmptyEl = document.getElementById(`empty-${z.empty}`);
                 if(targetEmptyEl) targetEmptyEl.innerText = totalSlotsForZone - totalOcc;
                 
-                const detailEl = document.getElementById(`detail-${domKey}`);
+                const detailEl = document.getElementById(`detail-${z.detail}`);
                 if(detailEl) {
                     detailEl.innerHTML = floorDetails.join(" | ");
-                    detailEl.style.display = hiddenCardDetails.has(domKey) ? 'none' : 'block';
-                    const arrowEl = document.getElementById(`arrow-${domKey}`);
-                    if(arrowEl) arrowEl.innerText = hiddenCardDetails.has(domKey) ? '▶' : '▼';
+                    detailEl.style.display = hiddenCardDetails.has(z.card) ? 'none' : 'block';
+                    const arrowEl = document.getElementById(`arrow-${z.arrow}`);
+                    if(arrowEl) arrowEl.innerText = hiddenCardDetails.has(z.card) ? '▶' : '▼';
                 }
             });
         }
@@ -970,7 +961,7 @@
             document.getElementById('searchInput').value = ''; 
             markedPos.clear();
             swipedCardIds.clear(); 
-            expiryFilterDays = 0; // 清除效期篩選
+            expiryFilterDays = 0; 
             document.getElementById('expiry30Btn').classList.remove('active');
             document.getElementById('expiry60Btn').classList.remove('active');
             logAction("搜尋查詢", `重置總覽`); 
