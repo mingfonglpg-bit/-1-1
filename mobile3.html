@@ -78,7 +78,8 @@
         .table-view tr.row-selected { background: rgba(168, 85, 247, 0.15) !important; border-left: 3px solid var(--marked); }
         
         .card-view { display: flex; flex-direction: column; gap: 8px; }
-        .info-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: transform 0.2s, opacity 0.2s; will-change: transform, opacity; overflow: hidden; }
+        /* ⚠️ 修復：加入 touch-action: pan-y 讓左右滑動判定更精準且不影響上下捲動 */
+        .info-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: transform 0.2s, opacity 0.2s; will-change: transform, opacity; overflow: hidden; touch-action: pan-y; }
         .info-card.card-selected { border-color: var(--marked); background: rgba(168, 85, 247, 0.08); box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
         .info-card.swiped-out { transform: translateX(100%) !important; opacity: 0 !important; }
         .info-card.swiped-out-left { transform: translateX(-100%) !important; opacity: 0 !important; }
@@ -389,7 +390,6 @@
                 if (!response.ok) throw new Error("連線錯誤");
                 const resData = await response.json();
                 if (resData.status === "success") {
-                    // 🎯 修正: 確保每筆資料有唯一 ID，防止抓錯對應資料
                     inventory = resData.data.map((item, index) => {
                         let rawZone = String(item.zone || "").trim();
                         if(rawZone === "冷藏庫-慢" || rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
@@ -533,7 +533,8 @@
                 filtered = inventory.filter(x => x.zone === cz && x.floor === cf);
             }
             
-            filtered = filtered.filter(x => !swipedCardIds.has(x.id));
+            // ⚠️ 修復：統一轉為字串判斷，解決因 ID 型別（數字或字串）不同造成的過濾失效
+            filtered = filtered.filter(x => !swipedCardIds.has(String(x.id)));
             
             if (currentSort.key) {
                 filtered.sort((a,b) => (a[currentSort.key] || "").localeCompare(b[currentSort.key] || "", undefined, {numeric:true}) * currentSort.order);
@@ -556,7 +557,6 @@
                 document.getElementById('cardViewContainer').classList.remove('in-mark-mode');
             }
 
-            // 🎯 修正: 將傳入 onclick 的 ${i.id} 加上單引號，保證無論 ID 是字串還是數字都能準確對應
             tableContainer.innerHTML = data.map(i => {
                 const s = checkDateStatus(i);
                 const isScrapped = (s === 3); 
@@ -577,7 +577,6 @@
                 </tr>`;
             }).join('');
 
-            // 🎯 修正: 將手機版字卡傳入 onclick 的 ${i.id} 加上單引號
             listContainer.innerHTML = data.map(i => {
                 const s = checkDateStatus(i);
                 const isScrapped = (s === 3); 
@@ -633,6 +632,7 @@
             renderAll();
         }
 
+       // ⚠️ 修復：精準實踐左滑隱藏、右滑跳轉
        function bindSwipeEvents() {
             const cards = document.querySelectorAll('.info-card');
             cards.forEach(card => {
@@ -650,7 +650,7 @@
                     moveX = e.touches[0].clientX - startX;
                     let moveY = e.touches[0].clientY - startY;
 
-                    // 若垂直滑動大於水平滑動，取消滑動判定
+                    // 若垂直滑動大於水平滑動，取消水平滑動判定
                     if (Math.abs(moveY) > Math.abs(moveX) && Math.abs(moveX) < 10) {
                         isSwiping = false;
                         card.style.transform = '';
@@ -667,14 +667,14 @@
 
                     // 判斷滑動距離
                     if (Math.abs(moveX) > 100) {
-                        const itemId = parseInt(card.getAttribute('data-id'));
-                        const itemData = inventory.find(x => x.id === itemId);
+                        const itemId = String(card.getAttribute('data-id')); // 確保為字串型別
+                        const itemData = inventory.find(x => String(x.id) === itemId);
 
                         if (moveX > 0) {
                             // 🚀 向右滑動：跳轉並帶入參數
                             if (itemData && itemData.name) {
                                 // 顯示提示
-                                showToast("查詢庫存中...", 2000);
+                                showToast("🔍 查詢庫存中...", 2000);
                                 
                                 // 組合 URL
                                 const searchUrl = `https://mingfonglpg-bit.github.io/-/count.html?search=${encodeURIComponent(itemData.name)}`;
@@ -683,13 +683,17 @@
                                 setTimeout(() => {
                                     window.location.href = searchUrl;
                                 }, 500);
+                            } else {
+                                // 若無品名則彈回
+                                card.style.transform = '';
+                                card.style.opacity = '1';
                             }
                         } else {
-                            // ⬅️ 向左滑動：原功能移除字卡
+                            // ⬅️ 向左滑動：移除字卡（僅視覺上消失，資料不刪除）
                             card.classList.add('swiped-out', 'swiped-out-left');
                             setTimeout(() => {
-                                swipedCardIds.add(itemId);
-                                renderTable();
+                                swipedCardIds.add(itemId); // 寫入隱藏清單
+                                renderTable(); // 重新渲染列表
                             }, 200);
                         }
                     } else {
@@ -802,14 +806,12 @@
             } 
         }
         
-        /* 🎯 徹底修正：解決回報/編輯視窗抓錯資料、重置下拉選單的問題 */
         function openBox(type, id) {
             let zVal = document.getElementById('vZone').value;
             let fVal = document.getElementById('vFloor').value;
 
             let item = null;
             if (id !== undefined && id !== null && id !== '') {
-                // 強制採用字串比對，解決型別錯誤導致抓不到的問題
                 item = inventory.find(x => String(x.id) === String(id));
             }
 
@@ -820,7 +822,6 @@
             document.getElementById('itemModal').style.display = 'block';
             document.getElementById('editId').value = item.id || '';
             
-            // 寫入當前字卡正確的資料
             document.getElementById('mZone').value = item.zone; 
             document.getElementById('mFloor').value = item.floor; 
             document.getElementById('mPos').value = item.pos;
@@ -831,7 +832,6 @@
             
             const isReport = (type === 'report');
             
-            // 禁用/啟用下拉選單，避免回報模式使用者誤觸改變原本正確的庫位
             document.getElementById('mZone').disabled = isReport;
             document.getElementById('mFloor').disabled = isReport;
             document.getElementById('mPos').readOnly = isReport;
@@ -846,7 +846,6 @@
             const id = document.getElementById('editId').value;
             const isReportMode = document.getElementById('reportFields').style.display === 'block';
             
-            // 存檔前必須解除 disabled 狀態，否則 JS 抓不到 .value 的值
             document.getElementById('mZone').disabled = false;
             document.getElementById('mFloor').disabled = false;
             
@@ -921,7 +920,6 @@
             }
         }
 
-        /* 🔒 儀表板看板加固：不變動任何看板 HTML，底層映射防錯處理 */
         function updateStats() {
             const zones = [
                 { card: "極冷庫-左", actualKey: "極冷庫-左", empty: "極冷庫-左", detail: "極冷庫-左", arrow: "極冷庫-左" },
