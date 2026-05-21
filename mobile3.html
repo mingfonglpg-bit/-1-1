@@ -130,7 +130,7 @@
     <div class="dashboard">
         <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
             <div class="stat-label">
-                <span>🥶 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
+                <span>❄️ 極冷庫-左 <span id="arrow-極冷庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '極冷庫-左')">×</button>
             </div>
             <div id="empty-極冷庫-左" class="stat-value">--</div>
@@ -146,7 +146,7 @@
         </div>
         <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
             <div class="stat-label">
-                <span>💧 冷藏庫-心理 <span id="arrow-冷藏庫-左">▼</span></span>
+                <span>🍏冷藏庫-右 <span id="arrow-冷藏庫-左">▼</span></span>
                 <button class="close-card-btn" onclick="closeStatCard(event, '冷藏庫-左')">×</button>
             </div>
             <div id="empty-冷藏庫-左" class="stat-value">--</div>
@@ -172,9 +172,9 @@
 
     <div class="nav-control">
         <select id="vZone" onchange="renderAll()">
-            <option value="極冷庫-左">🥶 極冷庫-左</option>
+            <option value="極冷庫-左">❄️極冷庫-左</option>
             <option value="極冷庫-右">❄️ 極冷庫-右</option>
-            <option value="冷藏庫-左">💧 冷藏庫-左</option>
+            <option value="冷藏庫-左">🍏冷藏庫-左</option>
             <option value="冷藏庫-右">🍏 冷藏庫-右</option>
             <option value="常溫區">📦 常溫區</option>
         </select>
@@ -195,9 +195,9 @@
         <button class="btn-main" style="background:#475569" onclick="clearSearch()">重置</button>
         
         <select id="cardSortSelect" onchange="handleCardSelectSort(this.value)" style="background:#334155; color:#fff; border:1px solid var(--border); padding:0 8px; border-radius:10px; font-size:12px; outline:none; margin-left:2px;">
-            <option value="default">默认排序</option>
-            <option value="batch-asc">批号 ↗</option>
-            <option value="batch-desc">批号 ↘</option>
+            <option value="default">默認排序</option>
+            <option value="batch-asc">批號 ↗</option>
+            <option value="batch-desc">批號 ↘</option>
             <option value="date-asc">效期 ↗</option>
             <option value="date-desc">效期 ↘</option>
         </select>
@@ -208,8 +208,8 @@
             <thead>
                 <tr>
                     <th onclick="sortTable('fullPos')">儲位</th>
-                    <th onclick="sortTable('name')">品名規格</th>
-                    <th onclick="sortTable('batch')">生產批號</th>
+                    <th onclick="sortTable('name')">品名</th>
+                    <th onclick="sortTable('batch')">批號</th>
                     <th onclick="sortTable('date')">有效日期</th>
                     <th onclick="sortTable('note')">備註說明</th>
                     <th>操作行為</th>
@@ -280,10 +280,12 @@
                         <select id="mStatusType">
                             <option value="">-- 請選擇判定狀態 --</option>
                             <option value="盤點中">🔍 現場盤點中</option>
-                            <option value="貨品異常">⚠️ 貨品品質異常</option>
-                            <option value="位置移位">🔄 儲位異動移位</option>
-                            <option value="即期出清">⚡ 即期降價出清</option>
-                            <option value="申請報廢">❌ 申請報廢除帳</option>
+                            <option value="貨品異常">⚠️ 貨品不符</option>
+                            <option value="位置移位">🔄 儲位異動</option>
+                            <option value="出清">⚡ 貨品出清</option>
+                            <option value="申請報廢">❌ 申請報廢</option>
+                            <option value="散貨">⚠️ 散貨貨品</option>
+                            <option value="即期品">⚠️ 即將到期</option>
                         </select>
                     </div>
                 </div>
