@@ -1028,9 +1028,11 @@
     function processExcelData(data) {
         inventory = data.slice(1).map((r, i) => {
             let rawZone = String(r[1]||"").trim();
-            if(rawZone === "極冷庫-left") rawZone = "極冷庫-左";
-            if(rawZone === "冷藏庫-left") rawZone = "冷藏庫-左";
-            if(rawZone === "冷藏庫-慢") rawZone = "冷藏庫-左";
+            if(rawZone === "極冷庫-左") rawZone = "極冷庫-左";
+            if(rawZone === "極冷庫-右") rawZone = "極冷庫-右";
+            if(rawZone === "冷藏庫-左") rawZone = "冷藏庫-左";
+            if(rawZone === "冷藏庫-右") rawZone = "冷藏庫-右";
+            if(rawZone === "常溫區") rawZone = "常溫區";
             return { 
                 id: Date.now() + i, 
                 zone: rawZone, 
