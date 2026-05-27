@@ -3,7 +3,7 @@ name: Sync Google Sheets to GitHub
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *' # 每天凌晨 00:00 自動執行
+    - cron: '0 16 * * *' # 每天凌晨 00:00 自動執行
 
 # 設定權限以允許 GitHub Actions 推送代碼
 permissions:
