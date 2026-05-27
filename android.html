@@ -213,12 +213,22 @@
     function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); }
 
     async function fetchData() {
-        toggleLoader(true);
-        try {
-            const res = await fetch(SCRIPT_URL);
-            const data = await res.json();
+    toggleLoader(true);
+    try {
+        // 同時獲取庫存資料與日期文字
+        const [res, dateRes] = await Promise.all([
+            fetch(SCRIPT_URL),
+            fetch("https://raw.githubusercontent.com/mingfonglpg-bit/-1-1/main/update.txt")
+        ]);
+        
+        const data = await res.json();
+        const dateText = await dateRes.text(); // 讀取 update.txt 的內容
             inventory = data.inventory;
             zoneConfigs = data.configs;
+
+        // 更新跑馬燈顯示
+        const marqueeText = document.querySelector('.marquee-text');
+        marqueeText.innerText = `🔔 系統公告：請務必依貨品原儲位編號進行入庫。${dateText.trim()} update!`;
             
             // 修正：冷藏庫 左/右 均為 17格
             zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 };
