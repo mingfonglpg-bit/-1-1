@@ -482,11 +482,34 @@
     }
 
     async function handleRestock(id) {
-        const item = inventory.find(i => i.id.toString() === id.toString()); if (!item || !item.name) { alert("此庫位為空！"); return; }
-        let track = inventory.filter(i => i.name === item.name).map(i => `${i.zone}${i.floor}-${i.pos}`).join(', ');
+        // 找到當前點擊的品項
+        const item = inventory.find(i => i.id.toString() === id.toString()); 
+        if (!item || !item.name) { alert("此庫位為空！"); return; }
+        
+        // 核心修正：搜尋全庫同品名產品，但排除當前這筆記錄本身 (.id !== item.id)
+        let otherItems = inventory.filter(i => i.name === item.name && i.id.toString() !== item.id.toString());
+        
+        // 生成同品在庫的軌跡文字
+        let trackText = otherItems.length > 0 
+            ? otherItems.map(i => `${i.zone}${i.floor}-${i.pos}`).join(', ') 
+            : '無其他同名在庫';
+            
         toggleLoader(true);
-        await dispatchAction({ action: 'edit', id: item.id, zone: item.zone, floor: item.floor, pos: item.pos, name: item.name, batch: item.batch || '', date: item.date ? item.date.split('T')[0] : '', note: `同品在庫: ${track}` });
-        alert(`✅ 智慧補貨軌跡已寫入備註！`); if (!isOfflineMode) fetchData(); else toggleLoader(false);
+        // 將最新變更回寫至系統備註
+        await dispatchAction({ 
+            action: 'edit', 
+            id: item.id, 
+            zone: item.zone, 
+            floor: item.floor, 
+            pos: item.pos, 
+            name: item.name, 
+            batch: item.batch || '', 
+            date: item.date ? item.date.split('T')[0] : '', 
+            note: `同品在庫: ${trackText}` 
+        });
+        
+        alert(`✅ 智慧補貨軌跡已寫入備註（已自動排除本儲位）！`); 
+        if (!isOfflineMode) fetchData(); else toggleLoader(false);
     }
 
     /* 修正點 3：修正手機版 data-label="儲位位置" 內部的區域名稱顯示結構，多預留顯示空間防止文字被切斷 */
