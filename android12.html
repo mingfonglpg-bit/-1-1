@@ -521,7 +521,7 @@
         document.getElementById('tableBody').innerHTML = searchFilteredList.slice(start, start + rowsPerPage).map(i => `
             <tr class="mobile-card-row" data-id="${i.id}">
                 <td class="td-select-cell" style="${isAdmin ? '' : 'display:none;'} text-align:center;"><input type="checkbox" class="row-select-box" value="${i.id}"></td>
-                <td data-label="儲位位置"><b style="color:${getZoneColor(i.zone)}">${i.floor}-${i.pos}</b><small>${i.zone}</small></td>
+                <td data-label="儲位位置"><b style="color:${getZoneColor(i.zone)}">${i.floor}-${i.pos}</b><small style="color:${getZoneColor(i.zone)}; opacity: 0.85; font-weight: bold; margin-left: 5px;">${i.zone}</small></td>
                 <td data-label="產品內容"><b>${i.name}</b>${i.note ? `<span class="report-label">⚠️ ${i.note}</span>` : ''}</td>
                 <td data-label="有效日期">${i.date ? i.date.split('T')[0] : '-'}</td>
                 <td data-label="批號碼"><code>${i.batch || '-'}</code></td>
