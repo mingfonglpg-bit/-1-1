@@ -505,7 +505,7 @@
             name: item.name, 
             batch: item.batch || '', 
             date: item.date ? item.date.split('T')[0] : '', 
-            note: `在庫: ${trackText}` 
+            note: `補貨: ${trackText}` 
         });
         
         alert(`✅ 智慧補貨軌跡已寫入備註（已自動排除本儲位）！`); 
