@@ -99,13 +99,67 @@
         .status-offline { background: #ef4444 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
+        /* 手機滑動操作專屬樣式 */
+        .mobile-card-row {
+            touch-action: pan-y;
+            position: relative;
+            will-change: transform, opacity;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
         @media screen and (max-width: 768px) {
             .header-actions { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
-            tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 15px; overflow: hidden; }
-            td { padding: 12px 15px; text-align: right; border: none !important; position: relative; display: flex; justify-content: space-between; align-items: center; }
-            td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; }
+            
+            /* 手機版字卡排版優化 */
+            tr { 
+                margin-bottom: 15px; 
+                border: 1px solid var(--border); 
+                border-radius: 18px; 
+                overflow: hidden; 
+                background: rgba(30, 41, 59, 0.8) !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                padding: 5px 0;
+            }
+            td { 
+                padding: 10px 16px; 
+                text-align: right; 
+                border: none !important; 
+                position: relative; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+                font-size: 14px;
+                border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+            }
+            td:last-child {
+                border-bottom: none !important;
+                justify-content: center;
+                background: rgba(255,255,255,0.02);
+                padding: 12px 16px;
+            }
+            td::before { 
+                content: attr(data-label); 
+                float: left; 
+                color: var(--text-dim); 
+                font-size: 12px; 
+                font-weight: 500;
+                letter-spacing: 0.5px;
+            }
+            td b { font-size: 15px; margin-bottom: 0; }
+            td small { font-size: 12px; color: var(--text-dim); }
+            .action-btns { width: 100%; justify-content: space-around; }
+            .action-btns .btn-main { flex: 1; text-align: center; justify-content: center; font-size: 13px; padding: 8px 5px !important; }
+
+            /* 手機版視覺化格位強置變更為一列 5 個 */
+            #visualGrid {
+                grid-template-columns: repeat(5, 1fr) !important;
+            }
+            #visualGrid .slot {
+                aspect-ratio: 1;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -230,7 +284,7 @@
  
     <div id="admin-panel" style="display:none; background:rgba(99,102,241,0.05); padding:20px; border-radius:24px; border:1px solid var(--primary); margin-bottom:25px;">
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
-            <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+            <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-right">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
             <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             <input type="number" id="addPos" placeholder="儲位" class="btn"><input type="text" id="addName" placeholder="產品" class="btn"><input type="text" id="addBatch" placeholder="批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn"><button onclick="commitAdd()" class="btn-main">➕ 入庫</button>
         </div>
@@ -246,7 +300,7 @@
         </div>
     </div>
 
-    <section style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 24px; border: 1px solid var(--border);">
+    <section id="visualSection" style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 24px; border: 1px solid var(--border); touch-action: pan-y;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
             <div style="display:flex; align-items:center; gap:12px;">
                 <b id="mapTitle" style="color:var(--primary);">載入中...</b>
@@ -344,7 +398,7 @@
         });
     }
 
-    function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); }
+    function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); initTouchEvents(); }
 
     function updateMarqueeTime() {
         const now = new Date();
@@ -615,7 +669,7 @@
                 zoneConfigs = req.result.value.configs || {};
                 
                 zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 };
-                zoneConfigs["冷藏庫-開"] = { maxPos: 17, cols: 9 };
+                zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 };
                 zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
                 
                 autoCheckExpiredDaily();
@@ -662,7 +716,14 @@
 
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
-        grid.style.gridTemplateColumns = `repeat(${config.cols}, 1fr)`;
+        
+        // 僅在非手機版時套用多行設定，手機版由 CSS 媒體查詢強制覆寫為 5 列
+        if (window.innerWidth > 768) {
+            grid.style.gridTemplateColumns = `repeat(${config.cols}, 1fr)`;
+        } else {
+            grid.style.gridTemplateColumns = `repeat(5, 1fr)`;
+        }
+        
         grid.innerHTML = '';
         const zoneColor = getZoneColor(zone);
 
@@ -805,7 +866,7 @@
         
         document.getElementById('tableBody').innerHTML = pagedData.map(i => {
             return `
-            <tr>
+            <tr class="mobile-card-row" data-id="${i.id}">
                 <td class="td-select-cell" style="${isAdmin ? '' : 'display:none;'} text-align:center;">
                     <input type="checkbox" class="row-select-box" value="${i.id}">
                 </td>
@@ -823,7 +884,9 @@
                 </td>
             </tr>`;
         }).join('') || '<tr><td colspan="7" style="text-align:center; padding:30px;">無資料</td></tr>';
+        
         renderPagination(totalPages);
+        if (window.innerWidth <= 768) { bindCardTouchEvents(); }
     }
 
     function handleSearchInput(isExact = false) { document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; currentPage = 1; renderTable(isExact); }
@@ -871,7 +934,14 @@
                         if(payload.name) inventory[idx].name = payload.name;
                         if(payload.batch) inventory[idx].batch = payload.batch;
                         if(payload.date) inventory[idx].date = payload.date;
-                        if(payload.note) inventory[idx].note = payload.note;
+                        
+                        // 修正離線回報的備註疊加邏輯
+                        if(payload.action === 'report') {
+                            let appendNote = `[${payload.type}] ${payload.reason || ''}`;
+                            inventory[idx].note = inventory[idx].note ? (inventory[idx].note + " | " + appendNote) : appendNote;
+                        } else if(payload.note) {
+                            inventory[idx].note = payload.note;
+                        }
                     }
                 } else if (payload.action === 'delete') {
                     inventory = inventory.filter(i => i.id.toString() !== payload.id.toString());
@@ -899,8 +969,11 @@
                 for (let item of items) {
                     try {
                         let idToDelete = item.id;
-                        delete item.id; 
+                        delete item.id; // 移除 IndexedDB 自增本地主鍵
+                        
+                        // 確保將完整的動作酬載重放到後端
                         await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(item) });
+                        
                         let delTx = db.transaction("queue", "readwrite");
                         delTx.objectStore("queue").delete(idToDelete);
                     } catch(e) { console.log("同步單筆失敗", e); }
@@ -999,6 +1072,89 @@
     function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
     function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
+
+    /* --- 新增手勢核心邏輯 --- */
+    function initTouchEvents() {
+        const visualSection = document.getElementById('visualSection');
+        let startX = 0, startY = 0;
+        
+        visualSection.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        
+        visualSection.addEventListener('touchend', (e) => {
+            let diffX = e.changedTouches[0].clientX - startX;
+            let diffY = e.changedTouches[0].clientY - startY;
+            
+            // 判斷是否為水平滑動且滑動距離大於 60px
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
+                const floorSelect = document.getElementById('vFloor');
+                const floors = ['1F', '2F', '3F', '4F'];
+                let currentIndex = floors.indexOf(floorSelect.value);
+                
+                if (diffX < 0) {
+                    // 向左滑：切換到更高樓層 (1F -> 2F)
+                    if (currentIndex < floors.length - 1) {
+                        floorSelect.value = floors[currentIndex + 1];
+                        renderVisual();
+                    }
+                } else {
+                    // 向右滑：切換到更低樓層 (2F -> 1F)
+                    if (currentIndex > 0) {
+                        floorSelect.value = floors[currentIndex - 1];
+                        renderVisual();
+                    }
+                }
+            }
+        }, { passive: true });
+    }
+
+    function bindCardTouchEvents() {
+        const cards = document.querySelectorAll('.mobile-card-row');
+        cards.forEach(card => {
+            let cardStartX = 0, cardStartY = 0;
+            
+            card.addEventListener('touchstart', (e) => {
+                cardStartX = e.touches[0].clientX;
+                cardStartY = e.touches[0].clientY;
+                card.style.transition = 'none';
+            }, { passive: true });
+            
+            card.addEventListener('touchmove', (e) => {
+                let currentX = e.touches[0].clientX;
+                let moveX = currentX - cardStartX;
+                let moveY = e.touches[0].clientY - cardStartY;
+                
+                if (Math.abs(moveX) > Math.abs(moveY)) {
+                    card.style.transform = `translateX(${moveX}px)`;
+                    if (moveX < 0) {
+                        card.style.opacity = Math.max(0.3, 1 + moveX / 200).toString();
+                    }
+                }
+            }, { passive: true });
+            
+            card.addEventListener('touchend', (e) => {
+                let finalX = e.changedTouches[0].clientX - cardStartX;
+                card.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                
+                if (finalX < -120) {
+                    // 往左滑動超過 120px：暫時隱藏
+                    card.style.transform = 'translateX(-100%)';
+                    card.style.opacity = '0';
+                    setTimeout(() => { card.style.display = 'none'; }, 300);
+                } else if (finalX > 120) {
+                    // 往右滑動超過 120px：查詢庫存
+                    card.style.transform = 'translateX(0px)';
+                    window.open("https://mingfonglpg-bit.github.io/-/count.html", "_blank");
+                } else {
+                    // 彈回原位
+                    card.style.transform = 'translateX(0px)';
+                    card.style.opacity = '1';
+                }
+            }, { passive: true });
+        });
+    }
 </script>
 </body>
 </html>
