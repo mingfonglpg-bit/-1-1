@@ -482,22 +482,34 @@
     }
 
     async function handleRestock(id) {
-        // 1.找到當前點擊的品項
-      const item = inventory.find(i => Number(i.id) === Number(id)); 
-        if (!item || !item.name) { alert("此庫位為空！"); return; }
+        // 1. 核心修正：使用 == (雙等號) 自動轉換型態比較，或強制轉字串，確保一定能找到該庫位資料
+        const item = inventory.find(i => i.id.toString() === id.toString()); 
         
-        // 2. 核心修正：精準搜尋全庫同品名產品，並【強制轉型】100% 排除當前這筆記錄本身
+        // 檢查防呆
+        if (!item) { 
+            alert("找不到此庫位資料，請重新整理網頁！"); 
+            return; 
+        }
+        if (!item.name || item.name.trim() === "") { 
+            alert("此庫位目前沒有存放產品（品名為空）！"); 
+            return; 
+        }
+        
+        // 2. 核心修正：精準搜尋全庫「相同品名」產品，且「100% 排除當前本儲位自己」
         let otherItems = inventory.filter(i => 
-            i.name === item.name && Number(i.id) !== Number(item.id)
+            i.name === item.name && i.id.toString() !== item.id.toString()
         );
-        // 3.生成同品在庫的軌跡文字
+        
+        // 3. 生成同品在庫的軌跡文字
         let trackText = otherItems.length > 0 
             ? otherItems.map(i => `${i.zone}${i.floor}-${i.pos}`).join(', ') 
             : '無庫存';
-        
-        let newNote = `庫內: ${trackText}`;    
+            
+        let newNote = `庫存: ${trackText}`;
+
         toggleLoader(true);
-        // 4.將最新變更回寫至系統備註
+        
+        // 4. 將最新變更回寫至系統試算表 (Action: edit)
         await dispatchAction({ 
             action: 'edit', 
             id: item.id, 
@@ -509,13 +521,13 @@
             date: item.date ? item.date.split('T')[0] : '', 
             note: newNote 
         });
-
-        // 5. 同步更新本地資料暫存，讓畫面能立即感知
+        
+        // 5. 同步更新本地即時暫存資料，讓手機版字卡能即時感知
         item.note = newNote;
         
-        alert(`✅ 智慧補貨軌跡已記錄！`); 
+        alert(`✅ 智慧補貨軌跡已寫入！`); 
         
-   // 6. 重新渲染表格與字卡，即時更新介面上的「備註狀態」
+        // 6. 重新整理資料或即時渲染畫面
         if (!isOfflineMode) {
             fetchData(); 
         } else {
