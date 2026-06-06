@@ -366,10 +366,15 @@
         <span id="clearSearch" class="search-clear" onclick="clearSearch()">✖</span>
     </div>
     <select id="mobileSortSelect" class="btn mobile-sort-select" onchange="mobileSortChange()">
-        <option value="">↕ 排序</option>
-        <option value="name">產品</option>
-        <option value="date">效期</option>
-        <option value="batch">批號</option>
+ <option value="">↕ 排序</option>       
+ <option value="date_asc">📅 有效日期 近→遠</option>
+    <option value="date_desc">📅 有效日期 遠→近</option>
+
+    <option value="batch_asc">🔢 批號 小→大</option>
+    <option value="batch_desc">🔢 批號 大→小</option>
+
+    <option value="name_asc">📦 產品A→Z</option>
+    <option value="name_desc">📦 產品Z→A</option>
     </select>
 </div>
 
@@ -942,9 +947,28 @@
 
     
 function mobileSortChange(){
-    const field=document.getElementById('mobileSortSelect').value;
-    if(!field) return;
-    handleSort(field);
+
+    const value =
+        document.getElementById('mobileSortSelect').value;
+
+    if(!value) return;
+
+    const [field, direction] = value.split('_');
+
+    currentSortField = field;
+
+    isSortAsc = direction === 'asc';
+
+    document.getElementById('sort-name').innerText = "↕";
+    document.getElementById('sort-date').innerText = "↕";
+    document.getElementById('sort-batch').innerText = "↕";
+
+    if(document.getElementById(`sort-${field}`)){
+        document.getElementById(`sort-${field}`).innerText =
+            isSortAsc ? "🔼" : "🔽";
+    }
+
+    renderTable(false);
 }
 
 function handleSearchInput(isExact = false) { document.getElementById('clearSearch').style.display = document.getElementById('searchInput').value ? 'block' : 'none'; currentPage = 1; renderTable(isExact); }
