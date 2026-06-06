@@ -378,11 +378,14 @@
         </div>
         <div class="mobile-sort-widget">
             <select id="mobileSortSelect" class="btn" onchange="handleMobileSort(this.value)">
-                <option value="">排序欄位</option>
-                <option value="name">📦 產品內容</option>
-                <option value="batch">🔢 批號碼</option>
-                <option value="date">📅 有效日期</option>
-            </select>
+        <option value="">排序欄位</option>
+        <option value="name_asc">📦 產品內容 (A-Z 🔼)</option>
+        <option value="name_desc">📦 產品內容 (Z-A 🔽)</option>
+        <option value="date_asc">📅 有效日期 (舊-新 🔼)</option>
+        <option value="date_desc">📅 有效日期 (新-舊 🔽)</option>
+        <option value="batch_asc">🔢 批號碼 (小-大 🔼)</option>
+        <option value="batch_desc">🔢 批號碼 (大-小 🔽)</option>
+    </select>
         </div>
     </div>
 
