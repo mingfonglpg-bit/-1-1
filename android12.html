@@ -482,21 +482,22 @@
     }
 
     async function handleRestock(id) {
-        // 找到當前點擊的品項
-        const item = inventory.find(i => i.id.toString() === id.toString()); 
+        // 1.找到當前點擊的品項
+      const item = inventory.find(i => Number(i.id) === Number(id)); 
         if (!item || !item.name) { alert("此庫位為空！"); return; }
         
-        // 核心修正：搜尋全庫同品名產品，但排除當前這筆記錄本身 (.id !== item.id)
-        let otherItems = inventory.filter(i => i.name === item.name && i.id.toString() !== item.id.toString());
-        
-        // 生成同品在庫的軌跡文字
+        // 2. 核心修正：精準搜尋全庫同品名產品，並【強制轉型】100% 排除當前這筆記錄本身
+        let otherItems = inventory.filter(i => 
+            i.name === item.name && Number(i.id) !== Number(item.id)
+        );
+        // 3.生成同品在庫的軌跡文字
         let trackText = otherItems.length > 0 
             ? otherItems.map(i => `${i.zone}${i.floor}-${i.pos}`).join(', ') 
             : '無庫存';
         
-        let newNote = `同品在庫: ${trackText}`;    
+        let newNote = `庫內: ${trackText}`;    
         toggleLoader(true);
-        // 將最新變更回寫至系統備註
+        // 4.將最新變更回寫至系統備註
         await dispatchAction({ 
             action: 'edit', 
             id: item.id, 
