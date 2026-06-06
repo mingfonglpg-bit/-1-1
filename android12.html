@@ -190,15 +190,16 @@
             <button class="btn-excel-mini" onclick="exportExcelData('expired')">📊 匯出即期品明細 (Excel)</button>
         </div>
         <div class="expired-grid" id="expiredGrid"></div>
+   
     </div>
-
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+<header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <h2 style="margin:0;">📦 庫位狀態</h2>
         <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
-            <button id="netStatusBtn" onclick="toggleNetworkMode()" class="btn-main status-online">🌐 線上模式</button>
-            <div id="usageInfo" class="usage-badge">使用率: --%</div>
-            <button onclick="fetchData()" class="btn-main" style="background:#334155;">🔄 刷新</button>
-            <button id="adminBtn" onclick="toggleAdmin()" class="btn-main" style="background:rgba(167,139,250,0.1); color:#a78bfa;">🛠️ 管理員</button>
+            <a href="https://mingfonglpg-bit.github.io/-/count.html" target="_blank" class="btn-main" style="background:#1e1b4b; color:#c7d2fe; border: 1px solid #4338ca; text-align:center; justify-content:center;">📊 查詢庫存</a>
+            <button id="netStatusBtn" onclick="toggleNetworkMode()" class="btn-main status-online" style="justify-content:center;">🌐 線上模式</button>
+            <div id="usageInfo" class="usage-badge" style="text-align:center; justify-content:center;">使用率: --%</div>
+            <button onclick="fetchData()" class="btn-main" style="background:#334155; justify-content:center;">🔄 刷新</button>
+            <button id="adminBtn" onclick="toggleAdmin()" class="btn-main" style="background:rgba(167,139,250,0.1); color:#a78bfa; justify-content:center;">🛠️ 管理員</button>
         </div>
     </header>
 
