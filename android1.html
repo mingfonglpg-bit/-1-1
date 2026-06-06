@@ -812,7 +812,7 @@
         }
         
         let emptyLocsOnFloor = config.maxPos - occupiedInThisFloor;
-        document.getElementById('floorEmptyCount').innerHTML = `🔲 剩餘空庫位: <span style="color:#22d3ee; font-size:15px;">${emptyLocsOnFloor}</span> 格`;
+        document.getElementById('floorEmptyCount').innerHTML = `🔲 空庫位: <span style="color:#22d3ee; font-size:15px;">${emptyLocsOnFloor}</span> 格`;
 
         const zoneItems = inventory.filter(i => i.zone === zone);
         const occupiedCount = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
