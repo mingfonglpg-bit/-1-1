@@ -561,7 +561,7 @@
                 <td data-label="產品內容"><b>${i.name}</b>${i.note ? `<span class="report-label">⚠️ ${i.note}</span>` : ''}</td>
                 <td data-label="有效日期">${i.date ? i.date.split('T')[0] : '-'}</td>
                 <td data-label="批號碼"><code>${i.batch || '-'}</code></td>
-                <td data-label="備註狀態"><small>${i.note ? '有紀錄' : '正常'}</small></td>
+               <td data-label="備註狀態"><small style="max-width: 100% !important; white-space: normal !important; display: inline-block; word-break: break-all;">${i.note ? i.note : '正常'}</small></td>
                 <td data-label="功能操作">
                     <div class="action-btns">
                         <button class="btn-main" style="background:#475569; padding:6px 10px;" onclick="openReport('${i.id}')">回報</button>
