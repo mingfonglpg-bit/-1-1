@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V28 (智慧預警折疊修復版)</title>
+    <title>⚡ 倉儲庫位控管系統 V30.1</title>
     <style>
         :root { 
             --primary: #06b6d4; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
@@ -177,7 +177,7 @@
 </div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V28</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V30.1</span></h1>
     <button class="btn-main welcome-btn-v265" style="padding: 20px 80px; border-radius: 50px; font-size: 1rem;" onclick="enterSystem()">啟動系統</button>
 </div>
 
@@ -833,7 +833,7 @@ function exportSelectedExcel(){
 #v30Drawer{position:fixed;top:0;right:-320px;width:300px;height:100%;background:#fff;z-index:9998;transition:right .25s;overflow:auto;box-shadow:-2px 0 8px rgba(0,0,0,.2);padding:10px}
 #v30Drawer.open{right:0}
 </style>
-<button id="v30Fab" onclick="v30ToggleDrawer()">🛒 已選 <span id="v30Count">0</span></button>
+<button id="v30Fab" onclick="v30ToggleDrawer()"> ☑已選 <span id="v30Count">0</span></button>
 <div id="v30Drawer"><h3>V30 暫存籃</h3><p>使用 V29.2 原有勾選功能。</p></div>
 <script>
 function v30ToggleDrawer(){
