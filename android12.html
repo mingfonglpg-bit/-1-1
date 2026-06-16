@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V28 (智慧預警折疊修復版)</title>
+    <title>⚡ 倉儲庫位控管系統 V28.1 (智慧預警折疊修復版)</title>
     <style>
         :root { 
             --primary: #06b6d4; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
@@ -177,7 +177,7 @@
 </div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V28</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V28.1</span></h1>
     <button class="btn-main welcome-btn-v265" style="padding: 20px 80px; border-radius: 50px; font-size: 1rem;" onclick="enterSystem()">啟動系統</button>
 </div>
 
@@ -304,9 +304,21 @@
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
     function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); initTouchEvents(); }
 
-    function updateMarqueeTime() {
-        const now = new Date(), timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}點${String(now.getMinutes()).padStart(2,'0')}分`;
-        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 最後回報變更點：${timeStr}:${String(now.getSeconds()).padStart(2,'0')}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 最後更新：${timeStr}`;
+    let savedUpdateTime = localStorage.getItem('warehouse_last_update_time') || '';
+    let savedUpdateSeconds = localStorage.getItem('warehouse_last_update_sec') || '';
+
+    function updateMarqueeTime(isAction = false) {
+        if (isAction) {
+            const now = new Date();
+            savedUpdateTime = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}點${String(now.getMinutes()).padStart(2,'0')}分`;
+            savedUpdateSeconds = String(now.getSeconds()).padStart(2,'0');
+            localStorage.setItem('warehouse_last_update_time', savedUpdateTime);
+        }
+        
+        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄";
+        let adminDisplayStr = savedUpdateTime ? `最後更新時間：${savedUpdateTime}:${savedUpdateSeconds}` : "目前暫無變更紀錄";
+
+        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 ${adminDisplayStr}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 ${displayStr}`;
     }
 
     function autoCheckExpiredDaily() {
@@ -414,7 +426,7 @@
             zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = zoneConfigs["冷藏庫-右"] || { maxPos: 14, cols: 7 };
             zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
             if(db) db.transaction("cache", "readwrite").objectStore("cache").put({ key: "inventoryData", value: data });
-            updateMarqueeTime(); autoCheckExpiredDaily(); renderAll();
+            updateMarqueeTime(false); autoCheckExpiredDaily(); renderAll();
         } catch (e) { loadFromLocalCache(); }
         toggleLoader(false);
     }
@@ -618,7 +630,7 @@
             let p = prompt("管理金鑰:"); 
             if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('th-select').style.display='table-cell'; document.getElementById('adminBtn').innerText="🔐 管理中"; } 
         } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('th-select').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; }
-        updateMarqueeTime(); renderTable(false);
+        updateMarqueeTime(false); renderTable(false);
     }
 
     function getFormFields(prefix) {
@@ -659,6 +671,7 @@
     async function deleteItem(id) { if(confirm("確定要刪除嗎？")) { toggleLoader(true); await dispatchAction({action:'delete', id}); if(!isOfflineMode) fetchData(); else toggleLoader(false); } }
 
     async function dispatchAction(payload) {
+        updateMarqueeTime(true); // 觸發寫入最新操作時間標籤
         if (isOfflineMode || !navigator.onLine) {
             return new Promise((resolve) => {
                 let tx = db.transaction("queue", "readwrite"); tx.objectStore("queue").add(payload);
