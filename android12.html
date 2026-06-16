@@ -315,7 +315,7 @@
             localStorage.setItem('warehouse_last_update_time', savedUpdateTime);
         }
         
-        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄";
+        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄2026/06/15";
         let adminDisplayStr = savedUpdateTime ? `最後更新時間：${savedUpdateTime}:${savedUpdateSeconds}` : "目前暫無變更紀錄";
 
         document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 ${adminDisplayStr}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 ${displayStr}`;
