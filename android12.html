@@ -12,7 +12,8 @@
             --select-bg: #1e293b; --select-text: #c7d2fe;
             --color-polar-l: #38bdf8; --color-polar-r: #818cf8;
             --color-cool-l:  #fbbf24; --color-cool-r:  #fb7185;
-            --color-normal:  #34d399; --color-cut:     #a855f7; 
+            --color-normal:  #34d399; --color-cut:     #a855f7;
+            --color-restock: #ec4899; /* 需補貨/產品即期/產品出清 */
             --filter-range-15: #ef4444; --filter-range-30: #f97316; --filter-range-60: #eab308;
         }
         * { box-sizing: border-box; transition: all 0.2s; }
@@ -36,6 +37,7 @@
         .slot.status-warning { background: var(--warning) !important; }
         .slot.status-danger { background: var(--danger) !important; }
         .slot.status-cut { background: var(--color-cut) !important; color: white; }
+        .slot.status-group-b { background: var(--color-restock) !important; color: white; }
         .date-filter-group { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .btn-filter { background: #1e293b; color: var(--text-dim); border: 1px solid var(--border); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
         .btn-filter:hover { color: var(--text-main); background: #334155; }
@@ -65,6 +67,11 @@
         .mobile-search-sort { display:flex; gap:8px; align-items:center; margin: 15px 0; }
         .mobile-sort-select { display:none; max-width:120px; height:55px; }
         .welcome-btn-v265 { background:linear-gradient(135deg,#06b6d4,#14b8a6)!important; border:none!important; box-shadow:0 10px 24px rgba(6,182,212,.35); }
+        .pending-badge { background:#ef4444; color:#fff; border-radius:999px; padding:2px 8px; font-size:11px; margin-left:6px; font-weight:bold; box-shadow:0 2px 6px rgba(239,68,68,.6); display:inline-block; min-width:18px; text-align:center; }
+        .sync-toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(120px); background:linear-gradient(135deg,#10b981,#06b6d4); color:#fff; padding:15px 30px; border-radius:50px; box-shadow:0 10px 30px rgba(0,0,0,.4); z-index:13000; opacity:0; transition:all .5s cubic-bezier(.16,1,.3,1); font-weight:bold; max-width:90%; text-align:center; pointer-events:none; }
+        .sync-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        .sync-toast.error { background:linear-gradient(135deg,#ef4444,#f59e0b); }
+        #netStatusBtn { position:relative; }
 
         @media screen and (max-width: 768px) {
             #f-15 { font-size: 0; } #f-15::before { content: "即期"; font-size: 13px; }
@@ -103,6 +110,7 @@
 <body>
 
 <div id="loader">⚙️ 資料處理中...</div>
+<div id="syncToast" class="sync-toast"></div>
 
 <div id="editModal" class="modal">
     <div class="modal-content">
@@ -288,17 +296,167 @@
     let currentPage = 1, rowsPerPage = 10, currentSortField = null, isSortAsc = true, currentDateFilter = 'all'; 
     let isOfflineMode = false, db = null, expiredItemsList = [], searchFilteredList = [], searchDebounceTimer = null;
     let searchLogs = JSON.parse(localStorage.getItem('warehouse_search_logs') || '[]');
+    /* === 離線同步管理狀態 === */
+    let isSyncing = false, localIdMap = {}, pendingCount = 0, autoRetryTimer = null;
 
     function initIndexedDB() {
-        const request = indexedDB.open("WarehouseOfflineDB", 1);
+        const request = indexedDB.open("WarehouseOfflineDB", 3);
         request.onupgradeneeded = (e) => {
             let localDb = e.target.result;
-            if(!localDb.objectStoreNames.contains("queue")) localDb.createObjectStore("queue", { keyPath: "id", autoIncrement: true });
+            /* 強制重建 queue 物件庫：解決 v1→v2 升級時 keyPath 不一致問題（舊 keyPath="id"，新 keyPath="queueId"） */
+            if (localDb.objectStoreNames.contains("queue")) localDb.deleteObjectStore("queue");
+            localDb.createObjectStore("queue", { keyPath: "queueId", autoIncrement: true });
             if(!localDb.objectStoreNames.contains("cache")) localDb.createObjectStore("cache", { keyPath: "key" });
+            if(!localDb.objectStoreNames.contains("idmap")) localDb.createObjectStore("idmap", { keyPath: "localId" });
         };
-        request.onsuccess = (e) => { db = e.target.result; if(navigator.onLine && !isOfflineMode) syncOfflineQueue(); };
+        request.onsuccess = async (e) => {
+            db = e.target.result;
+            try {
+                await loadLocalIdMap();
+                await updatePendingBadge();
+                if(navigator.onLine && !isOfflineMode) syncOfflineQueue();
+            } catch(err) { console.warn('初始化同步失敗:', err); }
+        };
+        request.onerror = () => console.warn('IndexedDB 開啟失敗');
     }
     initIndexedDB();
+
+    /* === Loader 安全網：避免任何意外導致 loader 永久顯示 === */
+    const _origToggleLoader = (s) => {
+        const el = document.getElementById('loader');
+        if (!el) return;
+        if (s) {
+            el.style.display = 'flex';
+            clearTimeout(el._safetyTimer);
+            el._safetyTimer = setTimeout(() => {
+                console.warn('Loader 已自動關閉（超過 10 秒）');
+                el.style.display = 'none';
+            }, 10000);
+        } else {
+            clearTimeout(el._safetyTimer);
+            el.style.display = 'none';
+        }
+    };
+
+    /* === 離線佇列與同步輔助函式 === */
+    function enqueueAction(payload) {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("queue", "readwrite");
+            tx.objectStore("queue").add({ payload, timestamp: Date.now() });
+            tx.oncomplete = () => { updatePendingBadge(); resolve(); };
+            tx.onerror = () => resolve();
+        });
+    }
+    function getAllQueuedActions() {
+        return new Promise((resolve) => {
+            if (!db) { resolve([]); return; }
+            db.transaction("queue", "readonly").objectStore("queue").getAll().onsuccess = (e) => resolve(e.target.result || []);
+        });
+    }
+    function removeQueuedAction(queueId) {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("queue", "readwrite");
+            tx.objectStore("queue").delete(queueId);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    }
+    function loadLocalIdMap() {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            db.transaction("idmap", "readonly").objectStore("idmap").getAll().onsuccess = (e) => {
+                (e.target.result || []).forEach(r => { localIdMap[r.localId] = r.serverId; });
+                resolve();
+            };
+        });
+    }
+    function saveIdMapping(localId, serverId) {
+        localIdMap[localId] = serverId;
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("idmap", "readwrite");
+            tx.objectStore("idmap").put({ localId, serverId });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    }
+    async function updatePendingBadge() {
+        if (!db) return;
+        const items = await getAllQueuedActions();
+        pendingCount = items.length;
+        const btn = document.getElementById('netStatusBtn');
+        if (!btn) return;
+        let baseText = isOfflineMode ? "📴 離線中" : (navigator.onLine ? "🌐 線上模式" : "📴 斷線中");
+        if (pendingCount > 0) {
+            btn.innerHTML = `${baseText} <span class="pending-badge">${pendingCount}</span>`;
+            btn.title = `目前有 ${pendingCount} 筆變更等待同步`;
+        } else {
+            btn.innerText = baseText;
+            btn.title = "";
+        }
+    }
+    function showSyncToast(msg, type = 'success') {
+        const toast = document.getElementById('syncToast');
+        if (!toast) return;
+        toast.innerText = msg;
+        toast.classList.remove('error');
+        if (type === 'error' || type === 'warning') toast.classList.add('error');
+        toast.classList.add('show');
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.remove('show'), 4500);
+    }
+    /* 將動作套用至本地 inventory（立即反映畫面，不等待伺服器） */
+    function applyActionToLocal(payload) {
+        if (payload.action === 'add') {
+            let newItem = { ...payload };
+            delete newItem.action;
+            if (!newItem.id) newItem.id = "local_" + Date.now() + "_" + Math.floor(Math.random()*10000);
+            if (newItem.pos !== undefined && newItem.pos !== '') newItem.pos = Number(newItem.pos);
+            inventory.push(newItem);
+            return newItem.id;
+        }
+        if (payload.action === 'edit') {
+            let idx = inventory.findIndex(i => String(i.id) === String(payload.id));
+            if (idx !== -1) {
+                if(payload.zone !== undefined) inventory[idx].zone = payload.zone;
+                if(payload.floor !== undefined) inventory[idx].floor = payload.floor;
+                if(payload.pos !== undefined) inventory[idx].pos = payload.pos;
+                if(payload.name !== undefined) inventory[idx].name = payload.name;
+                if(payload.batch !== undefined) inventory[idx].batch = payload.batch;
+                if(payload.date !== undefined) inventory[idx].date = payload.date;
+                if(payload.note !== undefined) inventory[idx].note = payload.note;
+            }
+        } else if (payload.action === 'report') {
+            let idx = inventory.findIndex(i => String(i.id) === String(payload.id));
+            if (idx !== -1) {
+                let app = `[${payload.type}] ${payload.reason || ''}`.trim();
+                inventory[idx].note = inventory[idx].note ? (inventory[idx].note + " | " + app) : app;
+            }
+        } else if (payload.action === 'delete') {
+            inventory = inventory.filter(i => String(i.id) !== String(payload.id));
+        }
+    }
+    /* 重新套用佇列中尚未同步的動作到 inventory 上（避免 fetchData 覆蓋本地暫存變更） */
+    async function reapplyPendingQueueLocally() {
+        if (!db) return;
+        const items = await getAllQueuedActions();
+        if (items.length === 0) return;
+        items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        for (let item of items) {
+            let p = { ...item.payload };
+            /* 若 add 已同步成功（id 在 localIdMap），跳過避免重複 */
+            if (p.action === 'add' && p.id && localIdMap[p.id]) {
+                let realId = localIdMap[p.id];
+                if (inventory.some(i => String(i.id) === String(realId))) continue;
+                p.id = realId;
+            }
+            /* edit / delete / report 若有對應的 real id，使用 real id */
+            if (p.id && localIdMap[p.id]) p.id = localIdMap[p.id];
+            applyActionToLocal(p);
+        }
+    }
 
     const getZoneColor = (z) => ({ "極冷庫-左": "var(--color-polar-l)", "極冷庫-右": "var(--color-polar-r)", "冷藏庫-左": "var(--color-cool-l)", "冷藏庫-右": "var(--color-cool-r)", "常溫區": "var(--color-normal)" }[z] || "var(--primary)");
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
@@ -410,36 +568,73 @@
 
     function toggleNetworkMode() {
         isOfflineMode = !isOfflineMode;
-        const btn = document.getElementById('netStatusBtn');
-        if (isOfflineMode) { btn.innerText = "📴 離線操作中"; btn.className = "btn-main status-offline"; document.getElementById('marqueeDisplay').innerText = "⚠️ 目前處於【強制離線模擬模式】，所有變更將安全暫存！"; }
-        else { btn.innerText = "🌐 線上模式"; btn.className = "btn-main status-online"; document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在比對自動將離線暫存同步至雲端..."; syncOfflineQueue(); }
+        if (isOfflineMode) {
+            document.getElementById('netStatusBtn').className = "btn-main status-offline";
+            document.getElementById('marqueeDisplay').innerText = "⚠️ 目前處於【強制離線模擬模式】，所有變更將安全暫存於本機，恢復連線後自動同步！";
+        } else {
+            document.getElementById('netStatusBtn').className = "btn-main status-online";
+            document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在自動將離線暫存同步至雲端...";
+            syncOfflineQueue();
+        }
+        updatePendingBadge();
     }
-    window.addEventListener('online', () => { if(!isOfflineMode) syncOfflineQueue(); });
+    function updateNetworkUI() {
+        const btn = document.getElementById('netStatusBtn');
+        if (isOfflineMode) btn.className = "btn-main status-offline";
+        else if (navigator.onLine) btn.className = "btn-main status-online";
+        else btn.className = "btn-main status-offline";
+        updatePendingBadge();
+    }
+    window.addEventListener('online', () => {
+        if (!isOfflineMode) {
+            updateNetworkUI();
+            document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在自動同步離線暫存至雲端...";
+            syncOfflineQueue();
+        }
+    });
+    window.addEventListener('offline', () => {
+        if (!isOfflineMode) {
+            updateNetworkUI();
+            document.getElementById('marqueeDisplay').innerText = "⚠️ 網路中斷，後續變更將暫存於本機，恢復連線後自動同步。";
+        }
+    });
 
     async function fetchData() {
         toggleLoader(true);
-        if(isOfflineMode || !navigator.onLine) { loadFromLocalCache(); toggleLoader(false); return; }
+        if(isOfflineMode || !navigator.onLine) { await loadFromLocalCache(); toggleLoader(false); return; }
         try {
             const res = await fetch(SCRIPT_URL), data = await res.json();
             inventory = data.inventory; zoneConfigs = data.configs || {};
             zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["極冷庫-右"] = zoneConfigs["極冷庫-右"] || { maxPos: 22, cols: 11 };
-            zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = zoneConfigs["冷藏庫-右"] || { maxPos: 14, cols: 7 };
+            zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 };
             zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
             if(db) db.transaction("cache", "readwrite").objectStore("cache").put({ key: "inventoryData", value: data });
+            await reapplyPendingQueueLocally();
             updateMarqueeTime(false); autoCheckExpiredDaily(); renderAll();
-        } catch (e) { loadFromLocalCache(); }
+        } catch (e) { await loadFromLocalCache(); }
         toggleLoader(false);
     }
-    
+
     function loadFromLocalCache() {
-        if(!db) return;
-        db.transaction("cache", "readonly").objectStore("cache").get("inventoryData").onsuccess = function(e) {
-            if(e.target.result) {
-                inventory = e.target.result.value.inventory; zoneConfigs = e.target.result.value.configs || {};
-                zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
-                autoCheckExpiredDaily(); renderAll();
-            } else alert("本機無快取，請在連線時載入一次。");
-        };
+        return new Promise((resolve) => {
+            if(!db) { resolve(); return; }
+            try {
+                const tx = db.transaction("cache", "readonly");
+                const store = tx.objectStore("cache");
+                const req = store.get("inventoryData");
+                req.onsuccess = async function(e) {
+                    if(e.target.result) {
+                        inventory = e.target.result.value.inventory; zoneConfigs = e.target.result.value.configs || {};
+                        zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
+                        try { await reapplyPendingQueueLocally(); } catch(err) { console.warn('重新套用佇列失敗:', err); }
+                        autoCheckExpiredDaily(); renderAll();
+                    } else alert("本機無快取，請在連線時載入一次。");
+                    resolve();
+                };
+                req.onerror = () => { console.warn('讀取快取失敗'); resolve(); };
+                tx.onerror = () => { console.warn('快取交易失敗'); resolve(); };
+            } catch(err) { console.warn('loadFromLocalCache 例外:', err); resolve(); }
+        });
     }
 
     function renderAll() { renderVisual(); renderTable(false); }
@@ -456,6 +651,7 @@
         const grid = document.getElementById('visualGrid');
         let zone = document.getElementById('vZone').value, floor = document.getElementById('vFloor').value;
         if (zone === "冷藏庫-左") zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 };
+        if (zone === "冷藏庫-右") zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 };
         if (zone === "常溫區") zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
@@ -470,9 +666,17 @@
             if (items.length > 0) {
                 occupied++; slot.classList.add('occupied');
                 let baseColor = getZoneColor(zone);
+                /* 狀態變色優先級：切 > 報廢 > A組(盤點/異常/移位) > B組(補貨/即期/出清) > 區域色 */
                 if (items.some(item => (item.name || "").includes("(切)"))) slot.classList.add('status-cut'), baseColor = "var(--color-cut)";
                 else if (items.some(item => (item.note || "").includes("報廢"))) slot.classList.add('status-danger'), baseColor = "var(--danger)";
-                else if (items.some(item => (item.note || "").includes("異常"))) slot.classList.add('status-warning'), baseColor = "var(--warning)";
+                else if (items.some(item => {
+                    const n = item.note || "";
+                    return n.includes("產品盤點") || n.includes("產品異常") || n.includes("產品移位");
+                })) slot.classList.add('status-warning'), baseColor = "var(--warning)";
+                else if (items.some(item => {
+                    const n = item.note || "";
+                    return n.includes("需補貨") || n.includes("產品即期") || n.includes("產品出清");
+                })) slot.classList.add('status-group-b'), baseColor = "var(--color-restock)";
                 slot.style.backgroundColor = baseColor; slot.style.opacity = "1";
                 if (currentDateFilter !== 'all') {
                     slot.style.opacity = items.some(item => getItemDateRangeTag(item) === currentDateFilter && !(item.note || "").includes("報廢")) ? "1" : "0.15";
@@ -482,8 +686,22 @@
             slot.innerHTML = `<b>${i}</b><span class="count">${items.length}件</span>`; grid.appendChild(slot);
         }
         document.getElementById('floorEmptyCount').innerHTML = `🔲 空庫位: <span style="color:#22d3ee; font-size:15px;">${config.maxPos - occupied}</span> 格`;
-        let zoneItems = inventory.filter(i => i.zone === zone), uniqueLocs = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
-        document.getElementById('usageInfo').innerText = `使用率: ${((uniqueLocs/(config.maxPos*4))*100).toFixed(1)}%`;
+        /* 使用率計算：只統計「合法庫位」（floor ∈ 1F-4F 且 1 ≤ pos ≤ maxPos），避免髒資料導致超過 100% */
+        const VALID_FLOORS = ['1F', '2F', '3F', '4F'];
+        const maxPos = config.maxPos;
+        let usedLocs = new Set();
+        inventory.forEach(it => {
+            if (it.zone !== zone) return;
+            if (!VALID_FLOORS.includes(it.floor)) return;
+            const p = Number(it.pos);
+            if (isNaN(p) || p < 1 || p > maxPos) return;
+            usedLocs.add(`${it.floor}-${p}`);
+        });
+        const totalSlots = maxPos * VALID_FLOORS.length;
+        let usagePct = totalSlots > 0 ? (usedLocs.size / totalSlots) * 100 : 0;
+        if (usagePct > 100) usagePct = 100;
+        if (usagePct < 0) usagePct = 0;
+        document.getElementById('usageInfo').innerText = `使用率: ${usagePct.toFixed(1)}%`;
     }
 
     function handleSort(field) {
@@ -537,15 +755,9 @@
         // 5. 同步更新本地即時暫存資料，讓手機版字卡能即時感知
         item.note = newNote;
         
-        alert(`✅ 智慧補貨軌跡已寫入！`); 
-        
-        // 6. 重新整理資料或即時渲染畫面
-        if (!isOfflineMode) {
-            fetchData(); 
-        } else {
-            renderTable();
-            toggleLoader(false);
-        }
+        alert(`✅ 智慧補貨軌跡已寫入！`);
+        // 6. dispatchAction 已套用至本地並立即渲染，線上時會於背景自動同步
+        toggleLoader(false);
     }
 
     /* 修正點 3：修正手機版 data-label="儲位位置" 內部的區域名稱顯示結構，多預留顯示空間防止文字被切斷 */
@@ -623,7 +835,7 @@
     const toggleSelectAllRows = (master) => document.querySelectorAll('.row-select-box').forEach(cb => cb.checked = master.checked);
     function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
-    const toggleLoader = (s) => document.getElementById('loader').style.display = s ? 'flex' : 'none';
+    const toggleLoader = (s) => _origToggleLoader(s);
 
     function toggleAdmin() {
         if(!isAdmin) { 
@@ -658,7 +870,7 @@
             payload = { action: 'add', ...getFormFields('add') };
         }
         await dispatchAction(payload);
-        if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        toggleLoader(false);
     }
 
     function openEdit(id) {
@@ -668,42 +880,123 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    async function deleteItem(id) { if(confirm("確定要刪除嗎？")) { toggleLoader(true); await dispatchAction({action:'delete', id}); if(!isOfflineMode) fetchData(); else toggleLoader(false); } }
+    async function deleteItem(id) { if(confirm("確定要刪除嗎？")) { toggleLoader(true); await dispatchAction({action:'delete', id}); toggleLoader(false); } }
 
+    /* === 統一寫入管線：所有變更一律「立即更新本地 + 寫入 IndexedDB 佇列 + 即時渲染 + 背景同步」 === */
     async function dispatchAction(payload) {
         updateMarqueeTime(true); // 觸發寫入最新操作時間標籤
-        if (isOfflineMode || !navigator.onLine) {
-            return new Promise((resolve) => {
-                let tx = db.transaction("queue", "readwrite"); tx.objectStore("queue").add(payload);
-                if (payload.action === 'edit' || payload.action === 'report') {
-                    let idx = inventory.findIndex(i => i.id.toString() === payload.id.toString());
-                    if (idx !== -1) {
-                        if(payload.name) inventory[idx].name = payload.name; if(payload.batch) inventory[idx].batch = payload.batch; if(payload.date) inventory[idx].date = payload.date;
-                        if(payload.action === 'report') {
-                            let app = `[${payload.type}] ${payload.reason || ''}`; inventory[idx].note = inventory[idx].note ? (inventory[idx].note + " | " + app) : app;
-                        } else if(payload.note) inventory[idx].note = payload.note;
-                    }
-                } else if (payload.action === 'delete') inventory = inventory.filter(i => i.id.toString() !== payload.id.toString());
-                else if (payload.action === 'add') { payload.id = "local_" + Date.now(); inventory.push(payload); }
-                renderAll(); resolve({ success: true, offline: true });
-            });
+        // 1. 為新加入的品項指派本地臨時 ID（避免與伺服器既有 ID 衝突）
+        if (payload.action === 'add' && !payload.id) {
+            payload.id = "local_" + Date.now() + "_" + Math.floor(Math.random()*10000);
         }
-        return (await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })).json();
+        // 2. 立即套用至本地 inventory（不論線上離線，畫面立刻反應）
+        applyActionToLocal(payload);
+        // 3. 寫入 IndexedDB 佇列（即使線上也是先寫入，再非同步同步，確保不漏單）
+        if (db) await enqueueAction(payload);
+        // 4. 立即重新渲染畫面
+        renderAll();
+        // 5. 若處於線上模式，於背景非同步執行同步程序
+        if (!isOfflineMode && navigator.onLine && db) {
+            syncOfflineQueue();
+        }
+        return { success: true, queued: true };
     }
 
+    /* === 離線佇列同步核心：FIFO 順序處理 + ID 重新對應 + 失敗自動重試 + 例外安全 === */
     async function syncOfflineQueue() {
-        if (!db) return;
-        db.transaction("queue", "readonly").objectStore("queue").getAll().onsuccess = async function(e) {
-            let items = e.target.result;
-            if (items && items.length > 0) {
-                toggleLoader(true);
-                for (let item of items) {
-                    try { let localId = item.id; delete item.id; await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(item) }); db.transaction("queue", "readwrite").objectStore("queue").delete(localId); } 
-                    catch(err) { console.log("同步失敗", err); }
+        if (!db || isSyncing || isOfflineMode || !navigator.onLine) return;
+        const items = await getAllQueuedActions();
+        if (items.length === 0) { updatePendingBadge(); return; }
+
+        isSyncing = true;
+        /* 背景同步不再使用全螢幕 loader，改用跑馬燈 + toast 通知，避免畫面卡死 */
+        document.getElementById('marqueeDisplay').innerText = `🔄 正在同步 ${items.length} 筆離線變更至雲端...`;
+
+        let successCount = 0, failCount = 0;
+        // 按時間戳排序確保 FIFO（先進先出）
+        items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        try {
+            for (let item of items) {
+                /* 偵測舊格式記錄（v1 升級殘留）：沒有 payload 包裝，直接刪除避免例外 */
+                if (!item.payload || typeof item.payload !== 'object') {
+                    console.warn('偵測到舊格式佇列記錄，自動清除:', item);
+                    try { await removeQueuedAction(item.queueId || item.id); } catch(e) {}
+                    continue;
                 }
-                fetchData();
+
+                const queueId = item.queueId;
+                const originalPayload = item.payload;
+                let serverPayload = { ...originalPayload };
+
+                // ID 重新對應：local_xxx → 伺服器真實 ID
+                if (serverPayload.id && localIdMap[serverPayload.id]) {
+                    serverPayload.id = localIdMap[serverPayload.id];
+                }
+
+                // 若是「刪除」一個從未同步至伺服器的本地新增品項，直接刪除佇列紀錄即可
+                if (serverPayload.action === 'delete' && String(serverPayload.id).startsWith('local_')) {
+                    await removeQueuedAction(queueId);
+                    successCount++;
+                    continue;
+                }
+
+                // 若是「編輯/回報」一個尚未同步新增的本地品項，跳過（保留在佇列中等待 add 先完成）
+                if ((serverPayload.action === 'edit' || serverPayload.action === 'report')
+                    && String(serverPayload.id).startsWith('local_')
+                    && !localIdMap[serverPayload.id]) {
+                    continue;
+                }
+
+                let res;
+                try {
+                    const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(serverPayload) });
+                    res = await r.json();
+                } catch (netErr) {
+                    failCount++;
+                    break; // 網路中斷，停止同步等待下次重試
+                }
+
+                if (res && res.success !== false) {
+                    // 新增成功後儲存 ID 對應，後續 edit/delete/report 才能找到正確的伺服器 ID
+                    if (originalPayload.action === 'add' && res.id) {
+                        await saveIdMapping(originalPayload.id, res.id);
+                        let idx = inventory.findIndex(i => String(i.id) === String(originalPayload.id));
+                        if (idx !== -1) inventory[idx].id = res.id;
+                    }
+                    await removeQueuedAction(queueId);
+                    successCount++;
+                } else {
+                    failCount++;
+                    break; // 伺服器回傳錯誤，停止同步等待下次重試
+                }
             }
-        };
+        } catch (err) {
+            /* 任何例外都由這裡接住，確保 isSyncing 一定會被重置 */
+            console.error('syncOfflineQueue 例外:', err);
+        } finally {
+            isSyncing = false;
+            try { await updatePendingBadge(); } catch(e) {}
+        }
+
+        if (successCount > 0) {
+            // 重新從伺服器抓取資料，讓使用者立即看到更新後結果
+            try { await fetchData(); } catch(e) { console.warn('同步後刷新失敗:', e); }
+            if (failCount === 0) {
+                showSyncToast(`✅ 已成功同步 ${successCount} 筆離線變更至雲端！`);
+                document.getElementById('marqueeDisplay').innerText = `✅ 離線暫存 ${successCount} 筆已全數同步至雲端，資料已刷新。`;
+            } else {
+                showSyncToast(`⚠️ 同步 ${successCount} 筆成功，${failCount} 筆待重試`, 'warning');
+                document.getElementById('marqueeDisplay').innerText = `⚠️ 部分同步成功 (${successCount} 筆)，剩餘 ${failCount} 筆將自動重試。`;
+                clearTimeout(autoRetryTimer);
+                autoRetryTimer = setTimeout(() => { if (!isOfflineMode && navigator.onLine) syncOfflineQueue(); }, 30000);
+            }
+        } else if (failCount > 0) {
+            showSyncToast(`❌ 同步失敗，將於 30 秒後自動重試`, 'error');
+            document.getElementById('marqueeDisplay').innerText = `❌ 同步失敗，將於 30 秒後自動重試。`;
+            clearTimeout(autoRetryTimer);
+            autoRetryTimer = setTimeout(() => { if (!isOfflineMode && navigator.onLine) syncOfflineQueue(); }, 30000);
+        }
     }
 
     async function executeBatchMove() {
@@ -715,14 +1008,14 @@
             let item = inventory.find(i => i.id.toString() === cb.value.toString());
             if(item) await dispatchAction({ action: 'edit', id: item.id, zone: tZone, floor: tFloor, pos: tPos, name: item.name, batch: item.batch || '', date: item.date ? item.date.split('T')[0] : '', note: item.note || '' });
         }
-        document.getElementById('selectAllBox').checked = false; if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        document.getElementById('selectAllBox').checked = false; toggleLoader(false);
     }
 
     async function executeBatchDelete() {
         const boxes = document.querySelectorAll('.row-select-box:checked'); if(!boxes.length) { alert("請先勾選品項！"); return; }
         if(!confirm(`⚠️ 確定刪除這 ${boxes.length} 筆項目嗎？`)) return;
         toggleLoader(true); for(let cb of boxes) await dispatchAction({ action: 'delete', id: cb.value });
-        document.getElementById('selectAllBox').checked = false; if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        document.getElementById('selectAllBox').checked = false; toggleLoader(false);
     }
 
     function initTouchEvents() {
