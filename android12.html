@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V28.1 (智慧預警折疊修復版)</title>
+    <title>⚡ 倉儲庫位控管系統 V28.1 </title>
     <style>
         :root { 
             --primary: #06b6d4; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
@@ -28,7 +28,7 @@
         .expired-card { background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border); padding: 15px; border-radius: 14px; }
         .search-action-bar { display: none; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 12px 20px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 15px; font-size: 14px; }
         .btn-excel-mini { background: #10b981 !important; color: white !important; font-size: 12px !important; padding: 6px 12px !important; border-radius: 8px !important; cursor: pointer; border: none; font-weight: bold; }
-        .empty-count-badge { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; }
+        .empty--badge { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; }
         select.btn, input.btn { background: var(--select-bg) !important; color: var(--select-text) !important; border: 1px solid var(--border); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-size: 14px; }
         .usage-badge { background: rgba(6, 182, 212, 0.15); color: var(--primary); padding: 8px 16px; border-radius: 12px; font-weight: bold; border: 1px solid rgba(6, 182, 212, 0.2); }
         .slot { aspect-ratio: 1; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; gap: 2px; font-weight: bold; color: var(--text-main); }
@@ -203,7 +203,7 @@
 <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <h2 style="margin:0;">📦 庫位狀態</h2>
         <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
-            <a href="https://mingfonglpg-bit.github.io/-/count.html" target="_blank" class="btn-main" style="background:#1e1b4b; color:#c7d2fe; border: 1px solid #4338ca; text-align:center; justify-content:center;">📊 查詢庫存</a>
+            <a href="https://mingfonglpg-bit.github.io/-/count1.html" target="_blank" class="btn-main" style="background:#1e1b4b; color:#c7d2fe; border: 1px solid #4338ca; text-align:center; justify-content:center;">📊 查詢庫存</a>
             <button id="netStatusBtn" onclick="toggleNetworkMode()" class="btn-main status-online" style="justify-content:center;">🌐 線上模式</button>
             <div id="usageInfo" class="usage-badge" style="text-align:center; justify-content:center;">使用率: --%</div>
             <button onclick="fetchData()" class="btn-main" style="background:#334155; justify-content:center;">🔄 刷新</button>
