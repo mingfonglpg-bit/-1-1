@@ -35,7 +35,7 @@
             padding: 16px; 
             border-radius: 0px; 
             border: none; 
-            display: none; 
+            display: block; /* 修正：預設顯示主容器以利初始化渲染 */
         }
         @media (min-width: 768px) {
             .container { margin: 20px auto; padding: 40px; border-radius: 28px; border: 1px solid var(--border); }
@@ -321,13 +321,6 @@
 
 <div id="cloud-status-toast">☁️ 雲端資料同步中...</div>
 
-<div id="welcome-page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
-    <h1 style="font-size: 30px; margin-bottom: 5px;">倉儲庫位控管系統</h1>
-    <h2 style="color:var(--primary); font-size: 36px; margin: 0 0 10px 0;">V24.3</h2>
-    <p style="color:var(--text-dim); margin-bottom: 30px; font-size: 16px;">行動端雲端連線版</p>
-    <button id="startSystemBtn" class="btn-main" style="width: 220px; padding: 16px; font-size: 16px;" onclick="enterSystem()">啟動系統</button>
-</div>
-
 <div id="itemModal" class="modal">
     <div class="modal-content">
         <h3 id="modalTitle" style="margin-top:0; font-size: 18px;">資料管理</h3>
@@ -362,38 +355,7 @@
 </div>
 
 <div class="container" id="main-container">
-    <div class="dashboard">
-        <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-左')">✖</span>
-            <div style="font-size:12px;">極冷左空位 <span id="arrow-極冷庫-左">▼</span></div>
-            <div id="empty-極冷庫-左" class="stat-value">--</div>
-            <div id="detail-極冷庫-左" class="floor-detail"></div>
-        </div>
-        <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-右')">✖</span>
-            <div style="font-size:12px;">極冷右空位 <span id="arrow-極冷庫-右">▼</span></div>
-            <div id="empty-極冷庫-右" class="stat-value">--</div>
-            <div id="detail-極冷庫-右" class="floor-detail"></div>
-        </div>
-        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-left')">✖</span>
-            <div style="font-size:12px;">冷藏左空位 <span id="arrow-冷藏庫-左">▼</span></div>
-            <div id="empty-冷藏庫-左" class="stat-value">--</div>
-            <div id="detail-冷藏庫-左" class="floor-detail"></div>
-        </div>
-        <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-right')">✖</span>
-            <div style="font-size:12px;">冷藏右空位 <span id="arrow-冷藏庫-右">▼</span></div>
-            <div id="empty-冷藏庫-右" class="stat-value">--</div>
-            <div id="detail-冷藏庫-右" class="floor-detail"></div>
-        </div>
-        <div class="stat-card" id="card-常溫區" style="grid-column: span 2;" onclick="toggleCardDetail('常溫區')">
-            <span class="card-close-btn" onclick="closeStatCard(event, '常溫區')">✖</span>
-            <div style="font-size:12px;">常溫區空位 <span id="arrow-常溫區">▼</span></div>
-            <div id="empty-常溫區" class="stat-value">--</div>
-            <div id="detail-常溫區" class="floor-detail"></div>
-        </div>
-    </div>
+ 
 
     <div class="marquee-wrapper">
         <div class="marquee-content">📢 系統提示 ｜ 最後更新日: 2026.5.18 ｜ 雲端即時連線控制中 ｜ 請定時審查即期預警品項...</div>
@@ -484,6 +446,11 @@
     let actionLogs = [];
     let searchDebounceTimer = null;
 
+    // 🚀 核心修正點：頁面 DOM 載入完畢後自動觸發系統初始化，修正空庫位資料未更新 BUG
+    window.addEventListener('DOMContentLoaded', () => {
+        enterSystem();
+    });
+
     function showToast(text, duration = 2000) {
         const toast = document.getElementById('cloud-status-toast');
         toast.innerText = text;
@@ -518,8 +485,6 @@
     }
 
     async function enterSystem() {
-        document.getElementById('welcome-page').style.display = 'none';
-        document.getElementById('main-container').style.display = 'block';
         showToast("☁️ 正在連線下載雲端庫存...", 0);
         
         try {
@@ -537,7 +502,6 @@
             }
         } catch (error) {
             console.error(error);
-            // 🛠️ 優化提示：告知使用者系統已啟動本地離線緩存功能
             console.log("無法連線至雲端 Google Sheets，改載入最後一次本地暫存檔。");
             const saved = localStorage.getItem('offlineData_V23_7');
             if(saved) { inventory = JSON.parse(saved); }
@@ -785,10 +749,6 @@
 
     function toggleCardDetail(zoneName) {
         let key = zoneName;
-        if(zoneName === '極冷庫-right') key = '極冷庫-右';
-        if(zoneName === '冷藏庫-left') key = '冷藏庫-左';
-        if(zoneName === '冷藏庫-right') key = '冷藏庫-右';
-
         const arrowEl = document.getElementById(`arrow-${key}`);
         const detailEl = document.getElementById(`detail-${key}`);
         if (hiddenCardDetails.has(key)) {
@@ -805,11 +765,6 @@
     function closeStatCard(event, zoneName) {
         event.stopPropagation();
         let key = zoneName;
-        if(zoneName === '極冷庫-left') key = '極冷庫-左';
-        if(zoneName === '極冷庫-right') key = '極冷庫-右';
-        if(zoneName === '冷藏庫-left') key = '冷藏庫-左';
-        if(zoneName === '冷藏庫-right') key = '冷藏庫-右';
-
         closedCards.add(key); 
         const cardEl = document.getElementById(`card-${key}`);
         if(cardEl) cardEl.style.display = 'none';
@@ -969,7 +924,9 @@
                 floorDetails.push(`${f}:<span class="stat-num-highlight">${22 - floorOcc}</span>`);
             });
             
-            const targetEmptyEl = document.getElementById(`empty-${domZone}`);
+            // 修正：針對極冷庫-左特殊ID對齊
+            const emptyTargetId = (domZone === "極冷庫-左") ? "empty-極冷庫-開" : `empty-${domZone}`;
+            const targetEmptyEl = document.getElementById(emptyTargetId);
             if(targetEmptyEl) targetEmptyEl.innerText = 88 - totalOcc;
             
             const detailEl = document.getElementById(`detail-${domZone}`);
