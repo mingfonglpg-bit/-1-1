@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V30.1</title>
+    <title>⚡ 倉儲庫位控管系統 V28.1 (智慧預警折疊修復版)</title>
     <style>
         :root { 
             --primary: #06b6d4; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
@@ -12,7 +12,8 @@
             --select-bg: #1e293b; --select-text: #c7d2fe;
             --color-polar-l: #38bdf8; --color-polar-r: #818cf8;
             --color-cool-l:  #fbbf24; --color-cool-r:  #fb7185;
-            --color-normal:  #34d399; --color-cut:     #a855f7; 
+            --color-normal:  #34d399; --color-cut:     #a855f7;
+            --color-restock: #ec4899; /* 需補貨/產品即期/產品出清 */
             --filter-range-15: #ef4444; --filter-range-30: #f97316; --filter-range-60: #eab308;
         }
         * { box-sizing: border-box; transition: all 0.2s; }
@@ -36,6 +37,7 @@
         .slot.status-warning { background: var(--warning) !important; }
         .slot.status-danger { background: var(--danger) !important; }
         .slot.status-cut { background: var(--color-cut) !important; color: white; }
+        .slot.status-group-b { background: var(--color-restock) !important; color: white; }
         .date-filter-group { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .btn-filter { background: #1e293b; color: var(--text-dim); border: 1px solid var(--border); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
         .btn-filter:hover { color: var(--text-main); background: #334155; }
@@ -65,6 +67,11 @@
         .mobile-search-sort { display:flex; gap:8px; align-items:center; margin: 15px 0; }
         .mobile-sort-select { display:none; max-width:120px; height:55px; }
         .welcome-btn-v265 { background:linear-gradient(135deg,#06b6d4,#14b8a6)!important; border:none!important; box-shadow:0 10px 24px rgba(6,182,212,.35); }
+        .pending-badge { background:#ef4444; color:#fff; border-radius:999px; padding:2px 8px; font-size:11px; margin-left:6px; font-weight:bold; box-shadow:0 2px 6px rgba(239,68,68,.6); display:inline-block; min-width:18px; text-align:center; }
+        .sync-toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(120px); background:linear-gradient(135deg,#10b981,#06b6d4); color:#fff; padding:15px 30px; border-radius:50px; box-shadow:0 10px 30px rgba(0,0,0,.4); z-index:13000; opacity:0; transition:all .5s cubic-bezier(.16,1,.3,1); font-weight:bold; max-width:90%; text-align:center; pointer-events:none; }
+        .sync-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        .sync-toast.error { background:linear-gradient(135deg,#ef4444,#f59e0b); }
+        #netStatusBtn { position:relative; }
 
         @media screen and (max-width: 768px) {
             #f-15 { font-size: 0; } #f-15::before { content: "即期"; font-size: 13px; }
@@ -74,23 +81,14 @@
             thead { display: none; }
             table, tbody, tr, td { display: block; width: 100%; }
             tr { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: rgba(30, 41, 59, 0.8) !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 5px 0; }
-            
-            /* 手機版預設：隱藏大部份欄位 */
             td { display: none !important; padding: 10px 16px; text-align: right; border: none !important; position: relative; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.03) !important; }
-            /* 預設維持可見：儲位位置與產品內容 */
             td[data-label="儲位位置"], td[data-label="產品內容"] { display: flex !important; } 
-            
-            /* 展開狀態下：全部顯示 */
             tr.expanded td { display: flex !important; }
-            
             td:last-child { border-bottom: none !important; justify-content: center; background: rgba(255,255,255,0.02); padding: 12px 16px; }
             td::before { content: attr(data-label); float: left; color: var(--text-dim); font-size: 12px; font-weight: 500; letter-spacing: 0.5px; flex-shrink: 0; margin-right: 15px; }
-            
-            /* 修正點 1：放寬小標籤限制，特別排除手機看區域(small)時被擠斷的問題 */
-             td code, .report-label { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 65% !important; display: inline-block !important; }
-           td b { display: inline-block !important; }
+            td code, .report-label { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 65% !important; display: inline-block !important; }
+            td b { display: inline-block !important; }
             td small { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 65% !important; display: inline-block !important; font-size: 12px; color: var(--text-dim); }
-            
             .report-label { margin-top: 0; margin-left: 5px; vertical-align: middle; }
             .action-btns { width: 100%; display: flex; gap: 6px; justify-content: space-between; }
             .action-btns .btn-main { flex: 1; text-align: center; justify-content: center; font-size: 12px; padding: 6px 2px !important; border-radius: 8px; min-height: 32px; }
@@ -103,6 +101,7 @@
 <body>
 
 <div id="loader">⚙️ 資料處理中...</div>
+<div id="syncToast" class="sync-toast"></div>
 
 <div id="editModal" class="modal">
     <div class="modal-content">
@@ -177,7 +176,7 @@
 </div>
 
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V30.1</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V28.1</span></h1>
     <button class="btn-main welcome-btn-v265" style="padding: 20px 80px; border-radius: 50px; font-size: 1rem;" onclick="enterSystem()">啟動系統</button>
 </div>
 
@@ -221,11 +220,8 @@
             <button onclick="executeBatchMove()" class="btn-main" style="background: var(--warning); padding: 8px 15px;">📦 批次轉移</button>
             <button onclick="executeBatchDelete()" class="btn-main" style="background: var(--danger); padding: 8px 15px;">🗑️ 批次刪除</button>
             <button onclick="openSearchLogModal()" class="btn-main" style="background: var(--primary); padding: 8px 15px; margin-left: auto;">📋 查看搜尋日誌</button>
-<button onclick="selectAllSearchResults()" class="btn-main" style="background:#0284c7;padding:8px 15px;">☑️ 全選搜尋</button>
-<button onclick="clearAllSelections()" class="btn-main" style="background:#64748b;padding:8px 15px;">❌ 清除勾選</button>
-<button onclick="exportSelectedExcel()" class="btn-main" style="background:#10b981;padding:8px 15px;">📥 匯出勾選</button>
-
-        </div>
+<a href="https://mingfonglpg-bit.github.io/-/upload.html" target="_blank" class="btn-main" style="background: var(--edit); padding: 8px 15px; text-decoration: none;">📤 上傳工具</a>
+</div>
     </div>
 
     <section id="visualSection" style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 24px; border: 1px solid var(--border); touch-action: pan-y;">
@@ -282,7 +278,18 @@
             <tbody id="tableBody"></tbody>
         </table>
     </div>
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
+
     <div class="pagination" id="paginationCtrl"></div>
+
+    <button
+        class="btn-main"
+        style="background:#10b981;"
+        onclick="exportCurrentPage()">
+        📥 匯出目前頁面
+    </button>
+
+</div>
 </div>
 
 <script>
@@ -292,25 +299,180 @@
     let currentPage = 1, rowsPerPage = 10, currentSortField = null, isSortAsc = true, currentDateFilter = 'all'; 
     let isOfflineMode = false, db = null, expiredItemsList = [], searchFilteredList = [], searchDebounceTimer = null;
     let searchLogs = JSON.parse(localStorage.getItem('warehouse_search_logs') || '[]');
+    /* === 離線同步管理狀態 === */
+    let isSyncing = false, localIdMap = {}, pendingCount = 0, autoRetryTimer = null;
 
     function initIndexedDB() {
-        const request = indexedDB.open("WarehouseOfflineDB", 1);
+        const request = indexedDB.open("WarehouseOfflineDB", 3);
         request.onupgradeneeded = (e) => {
             let localDb = e.target.result;
-            if(!localDb.objectStoreNames.contains("queue")) localDb.createObjectStore("queue", { keyPath: "id", autoIncrement: true });
+            if (localDb.objectStoreNames.contains("queue")) localDb.deleteObjectStore("queue");
+            localDb.createObjectStore("queue", { keyPath: "queueId", autoIncrement: true });
             if(!localDb.objectStoreNames.contains("cache")) localDb.createObjectStore("cache", { keyPath: "key" });
+            if(!localDb.objectStoreNames.contains("idmap")) localDb.createObjectStore("idmap", { keyPath: "localId" });
         };
-        request.onsuccess = (e) => { db = e.target.result; if(navigator.onLine && !isOfflineMode) syncOfflineQueue(); };
+        request.onsuccess = async (e) => {
+            db = e.target.result;
+            try {
+                await loadLocalIdMap();
+                await updatePendingBadge();
+                if(navigator.onLine && !isOfflineMode) syncOfflineQueue();
+            } catch(err) { console.warn('初始化同步失敗:', err); }
+        };
+        request.onerror = () => console.warn('IndexedDB 開啟失敗');
     }
     initIndexedDB();
+
+    const _origToggleLoader = (s) => {
+        const el = document.getElementById('loader');
+        if (!el) return;
+        if (s) {
+            el.style.display = 'flex';
+            clearTimeout(el._safetyTimer);
+            el._safetyTimer = setTimeout(() => {
+                console.warn('Loader 已自動關閉（超過 10 秒）');
+                el.style.display = 'none';
+            }, 10000);
+        } else {
+            clearTimeout(el._safetyTimer);
+            el.style.display = 'none';
+        }
+    };
+
+    function enqueueAction(payload) {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("queue", "readwrite");
+            tx.objectStore("queue").add({ payload, timestamp: Date.now() });
+            tx.oncomplete = () => { updatePendingBadge(); resolve(); };
+            tx.onerror = () => resolve();
+        });
+    }
+    function getAllQueuedActions() {
+        return new Promise((resolve) => {
+            if (!db) { resolve([]); return; }
+            db.transaction("queue", "readonly").objectStore("queue").getAll().onsuccess = (e) => resolve(e.target.result || []);
+        });
+    }
+    function removeQueuedAction(queueId) {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("queue", "readwrite");
+            tx.objectStore("queue").delete(queueId);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    }
+    function loadLocalIdMap() {
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            db.transaction("idmap", "readonly").objectStore("idmap").getAll().onsuccess = (e) => {
+                (e.target.result || []).forEach(r => { localIdMap[r.localId] = r.serverId; });
+                resolve();
+            };
+        });
+    }
+    function saveIdMapping(localId, serverId) {
+        localIdMap[localId] = serverId;
+        return new Promise((resolve) => {
+            if (!db) { resolve(); return; }
+            let tx = db.transaction("idmap", "readwrite");
+            tx.objectStore("idmap").put({ localId, serverId });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    }
+    async function updatePendingBadge() {
+        if (!db) return;
+        const items = await getAllQueuedActions();
+        pendingCount = items.length;
+        const btn = document.getElementById('netStatusBtn');
+        if (!btn) return;
+        let baseText = isOfflineMode ? "📴 離線中" : (navigator.onLine ? "🌐 線上模式" : "📴 斷線中");
+        if (pendingCount > 0) {
+            btn.innerHTML = `${baseText} <span class="pending-badge">${pendingCount}</span>`;
+            btn.title = `目前有 ${pendingCount} 筆變更等待同步`;
+        } else {
+            btn.innerText = baseText;
+            btn.title = "";
+        }
+    }
+    function showSyncToast(msg, type = 'success') {
+        const toast = document.getElementById('syncToast');
+        if (!toast) return;
+        toast.innerText = msg;
+        toast.classList.remove('error');
+        if (type === 'error' || type === 'warning') toast.classList.add('error');
+        toast.classList.add('show');
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.remove('show'), 4500);
+    }
+    function applyActionToLocal(payload) {
+        if (payload.action === 'add') {
+            let newItem = { ...payload };
+            delete newItem.action;
+            if (!newItem.id) newItem.id = "local_" + Date.now() + "_" + Math.floor(Math.random()*10000);
+            if (newItem.pos !== undefined && newItem.pos !== '') newItem.pos = Number(newItem.pos);
+            inventory.push(newItem);
+            return newItem.id;
+        }
+        if (payload.action === 'edit') {
+            let idx = inventory.findIndex(i => String(i.id) === String(payload.id));
+            if (idx !== -1) {
+                if(payload.zone !== undefined) inventory[idx].zone = payload.zone;
+                if(payload.floor !== undefined) inventory[idx].floor = payload.floor;
+                if(payload.pos !== undefined) inventory[idx].pos = payload.pos;
+                if(payload.name !== undefined) inventory[idx].name = payload.name;
+                if(payload.batch !== undefined) inventory[idx].batch = payload.batch;
+                if(payload.date !== undefined) inventory[idx].date = payload.date;
+                if(payload.note !== undefined) inventory[idx].note = payload.note;
+            }
+        } else if (payload.action === 'report') {
+            let idx = inventory.findIndex(i => String(i.id) === String(payload.id));
+            if (idx !== -1) {
+                let app = `[${payload.type}] ${payload.reason || ''}`.trim();
+                inventory[idx].note = inventory[idx].note ? (inventory[idx].note + " | " + app) : app;
+            }
+        } else if (payload.action === 'delete') {
+            inventory = inventory.filter(i => String(i.id) !== String(payload.id));
+        }
+    }
+    async function reapplyPendingQueueLocally() {
+        if (!db) return;
+        const items = await getAllQueuedActions();
+        if (items.length === 0) return;
+        items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        for (let item of items) {
+            let p = { ...item.payload };
+            if (p.action === 'add' && p.id && localIdMap[p.id]) {
+                let realId = localIdMap[p.id];
+                if (inventory.some(i => String(i.id) === String(realId))) continue;
+                p.id = realId;
+            }
+            if (p.id && localIdMap[p.id]) p.id = localIdMap[p.id];
+            applyActionToLocal(p);
+        }
+    }
 
     const getZoneColor = (z) => ({ "極冷庫-左": "var(--color-polar-l)", "極冷庫-右": "var(--color-polar-r)", "冷藏庫-左": "var(--color-cool-l)", "冷藏庫-右": "var(--color-cool-r)", "常溫區": "var(--color-normal)" }[z] || "var(--primary)");
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
     function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); initTouchEvents(); }
 
-    function updateMarqueeTime() {
-        const now = new Date(), timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}點${String(now.getMinutes()).padStart(2,'0')}分`;
-        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 最後回報變更點：${timeStr}:${String(now.getSeconds()).padStart(2,'0')}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 最後更新：${timeStr}`;
+    let savedUpdateTime = localStorage.getItem('warehouse_last_update_time') || '';
+    let savedUpdateSeconds = localStorage.getItem('warehouse_last_update_sec') || '';
+
+    function updateMarqueeTime(isAction = false) {
+        if (isAction) {
+            const now = new Date();
+            savedUpdateTime = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}點${String(now.getMinutes()).padStart(2,'0')}分`;
+            savedUpdateSeconds = String(now.getSeconds()).padStart(2,'0');
+            localStorage.setItem('warehouse_last_update_time', savedUpdateTime);
+        }
+        
+        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄2026/06/15";
+        let adminDisplayStr = savedUpdateTime ? `最後更新時間：${savedUpdateTime}:${savedUpdateSeconds}` : "目前暫無變更紀錄";
+
+        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 ${adminDisplayStr}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 ${displayStr}`;
     }
 
     function autoCheckExpiredDaily() {
@@ -351,7 +513,6 @@
         else { renderExpiredCardsArea(); sec.style.display = 'block'; sec.scrollIntoView({ behavior: 'smooth' }); }
     }
 
-    /* 修正點 2：明確調整即期品字卡（下方字卡）的顯示結構與寬度，確保區域名稱100%可見 */
     function renderExpiredCardsArea() {
         document.getElementById('expiredGrid').innerHTML = expiredItemsList.map(i => `
             <div class="expired-card" style="border-left: 4px solid ${getZoneColor(i.zone)}">
@@ -360,20 +521,135 @@
                     <span style="color:var(--danger); font-weight:bold; flex-shrink:0;">即期</span>
                 </div>
                 <b style="font-size:15px; color:#fff; margin-bottom:4px; display:block;">${i.name}</b>
-                <div style="font-size:13px; margin-top:2px;">📅 效期：<span style="color:var(--warning); font-weight:bold;">${i.date ? i.date.split('T')[0] : '-'}</span></div>
+                <div style="font-size:13px; margin-top:2px;">📅 效期：<span style="color:var(--warning); font-weight:bold;">${i.date ? String(i.date).split('T')[0] : '-'}</span></div>
                 <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">🔢 批號：<code>${i.batch || '-'}</code></div>
                 ${i.note ? `<div class="report-label" style="width:100%; text-align:left;">備註: ${i.note}</div>` : ''}
             </div>
         `).join('');
     }
 
+    /* 🛠️ 已修復：過濾作業系統不允許的非法檔名字元，防止瀏覽器靜默阻擋下載 */
     function exportExcelData(type) {
         let exportData = type === 'expired' ? expiredItemsList : searchFilteredList;
-        if (exportData.length === 0) { alert("目前無可供匯出的資料！"); return; }
-        let template = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1"><tr style="background-color:#06b6d4; color:#ffffff; font-weight:bold;"><th>區域</th><th>樓層</th><th>儲位編號</th><th>產品名稱</th><th>有效日期</th><th>批號碼</th><th>備註說明</th></tr>${exportData.map(i => `<tr><td>${i.zone || ''}</td><td>${i.floor || ''}</td><td>${i.pos || ''}</td><td>${i.name || ''}</td><td>${i.date ? i.date.split('T')[0] : ''}</td><td>${i.batch || ''}</td><td>${i.note || ''}</td></tr>`).join('')}</table></body></html>`;
-        let blob = new Blob([template], { type: 'application/vnd.ms-excel' }), link = document.createElement("a");
-        link.href = URL.createObjectURL(blob); link.download = type === 'expired' ? `全庫即期品明細_${new Date().toISOString().split('T')[0]}.xls` : `搜尋篩選結果_${document.getElementById('searchInput').value || '全部'}.xls`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        if (!exportData || exportData.length === 0) { 
+            alert("目前無可供匯出的資料！"); 
+            return; 
+        }
+
+        let template = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1"><tr style="background-color:#06b6d4; color:#ffffff; font-weight:bold;"><th>區域</th><th>樓層</th><th>儲位編號</th><th>產品名稱</th><th>有效日期</th><th>批號碼</th><th>備註說明</th></tr>${exportData.map(i => `<tr><td>${i.zone || ''}</td><td>${i.floor || ''}</td><td>${i.pos || ''}</td><td>${i.name || ''}</td><td>${i.date ? String(i.date).split('T')[0] : ''}</td><td>${i.batch || ''}</td><td>${i.note || ''}</td></tr>`).join('')}</table></body></html>`;
+        
+        let blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob); 
+        
+        if (type === 'expired') {
+            link.download = `全庫即期品明細_${new Date().toISOString().split('T')[0]}.xls`;
+        } else {
+            let kw = document.getElementById('searchInput').value || '全部';
+            // 核心修復：使用 Regex 取代掉不允許作為檔名的字元
+            let safeKw = kw.replace(/[\\/:*?"<>|]/g, "_");
+            link.download = `搜尋篩選結果_${safeKw}.xls`;
+        }
+        
+        document.body.appendChild(link); 
+        link.click(); 
+        document.body.removeChild(link);
+    }
+
+    function exportCurrentPage(){
+        let keyword=document.getElementById("searchInput").value.trim().toLowerCase();
+        let data=[...inventory];
+
+        if(keyword!=""){
+            data=data.filter(item=>{
+                return (
+                    (item.name||"").toLowerCase().includes(keyword)
+                    ||
+                    (item.batch||"").toLowerCase().includes(keyword)
+                    ||
+                    (`${item.zone}${item.floor}-${item.pos}`).toLowerCase().includes(keyword)
+                );
+            });
+        }
+
+        if(currentDateFilter!="all"){
+            data=data.filter(item=>getItemDateRangeTag(item)==currentDateFilter);
+        }
+
+        if(currentSortField){
+            data.sort((a,b)=>{
+                let x=a[currentSortField]||"";
+                let y=b[currentSortField]||"";
+                if(currentSortField=="date"){
+                    x=new Date(x);
+                    y=new Date(y);
+                }
+                if(x<y)return isSortAsc?-1:1;
+                if(x>y)return isSortAsc?1:-1;
+                return 0;
+            });
+        }
+
+        let start=(currentPage-1)*rowsPerPage;
+        let pageData=data.slice(start,start+rowsPerPage);
+
+        if(pageData.length==0){
+            alert("目前沒有資料可以匯出");
+            return;
+        }
+
+        let html=`
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+    <meta charset="UTF-8">
+    </head>
+    <body>
+    <table border="1">
+    <tr style="background:#06b6d4;color:white;">
+    <th>區域</th>
+    <th>樓層</th>
+    <th>儲位</th>
+    <th>產品</th>
+    <th>效期</th>
+    <th>批號</th>
+    <th>備註</th>
+    </tr>
+    `;
+
+        pageData.forEach(i=>{
+            html+=`
+    <tr>
+    <td>${i.zone||""}</td>
+    <td>${i.floor||""}</td>
+    <td>${i.pos||""}</td>
+    <td>${i.name||""}</td>
+    <td>${i.date?String(i.date).split("T")[0]:""}</td>
+    <td>${i.batch||""}</td>
+    <td>${i.note||""}</td>
+    </tr>
+    `;
+        });
+
+        html+=`
+    </table>
+    </body>
+    </html>
+    `;
+
+        let blob=new Blob(
+            [html],
+            {type:"application/vnd.ms-excel"}
+        );
+        let a=document.createElement("a");
+        a.href=URL.createObjectURL(blob);
+        let d=new Date();
+        let fileName=`目前頁面_${currentPage}頁_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}_${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}.xls`;
+        a.download=fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 
     function logSearchAction(kw, count) {
@@ -402,36 +678,73 @@
 
     function toggleNetworkMode() {
         isOfflineMode = !isOfflineMode;
-        const btn = document.getElementById('netStatusBtn');
-        if (isOfflineMode) { btn.innerText = "📴 離線操作中"; btn.className = "btn-main status-offline"; document.getElementById('marqueeDisplay').innerText = "⚠️ 目前處於【強制離線模擬模式】，所有變更將安全暫存！"; }
-        else { btn.innerText = "🌐 線上模式"; btn.className = "btn-main status-online"; document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在比對自動將離線暫存同步至雲端..."; syncOfflineQueue(); }
+        if (isOfflineMode) {
+            document.getElementById('netStatusBtn').className = "btn-main status-offline";
+            document.getElementById('marqueeDisplay').innerText = "⚠️ 目前處於【強制離線模擬模式】，所有變更將安全暫存於本機，恢復連線後自動同步！";
+        } else {
+            document.getElementById('netStatusBtn').className = "btn-main status-online";
+            document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在自動將離線暫存同步至雲端...";
+            syncOfflineQueue();
+        }
+        updatePendingBadge();
     }
-    window.addEventListener('online', () => { if(!isOfflineMode) syncOfflineQueue(); });
+    function updateNetworkUI() {
+        const btn = document.getElementById('netStatusBtn');
+        if (isOfflineMode) btn.className = "btn-main status-offline";
+        else if (navigator.onLine) btn.className = "btn-main status-online";
+        else btn.className = "btn-main status-offline";
+        updatePendingBadge();
+    }
+    window.addEventListener('online', () => {
+        if (!isOfflineMode) {
+            updateNetworkUI();
+            document.getElementById('marqueeDisplay').innerText = "🔔 網絡連線已恢復！正在自動同步離線暫存至雲端...";
+            syncOfflineQueue();
+        }
+    });
+    window.addEventListener('offline', () => {
+        if (!isOfflineMode) {
+            updateNetworkUI();
+            document.getElementById('marqueeDisplay').innerText = "⚠️ 網路中斷，後續變更將暫存於本機，恢復連線後自動同步。";
+        }
+    });
 
     async function fetchData() {
         toggleLoader(true);
-        if(isOfflineMode || !navigator.onLine) { loadFromLocalCache(); toggleLoader(false); return; }
+        if(isOfflineMode || !navigator.onLine) { await loadFromLocalCache(); toggleLoader(false); return; }
         try {
             const res = await fetch(SCRIPT_URL), data = await res.json();
             inventory = data.inventory; zoneConfigs = data.configs || {};
             zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["極冷庫-右"] = zoneConfigs["極冷庫-右"] || { maxPos: 22, cols: 11 };
-            zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = zoneConfigs["冷藏庫-右"] || { maxPos: 14, cols: 7 };
+            zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 };
             zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
             if(db) db.transaction("cache", "readwrite").objectStore("cache").put({ key: "inventoryData", value: data });
-            updateMarqueeTime(); autoCheckExpiredDaily(); renderAll();
-        } catch (e) { loadFromLocalCache(); }
+            await reapplyPendingQueueLocally();
+            updateMarqueeTime(false); autoCheckExpiredDaily(); renderAll();
+        } catch (e) { await loadFromLocalCache(); }
         toggleLoader(false);
     }
-    
+
     function loadFromLocalCache() {
-        if(!db) return;
-        db.transaction("cache", "readonly").objectStore("cache").get("inventoryData").onsuccess = function(e) {
-            if(e.target.result) {
-                inventory = e.target.result.value.inventory; zoneConfigs = e.target.result.value.configs || {};
-                zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
-                autoCheckExpiredDaily(); renderAll();
-            } else alert("本機無快取，請在連線時載入一次。");
-        };
+        return new Promise((resolve) => {
+            if(!db) { resolve(); return; }
+            try {
+                const tx = db.transaction("cache", "readonly");
+                const store = tx.objectStore("cache");
+                const req = store.get("inventoryData");
+                req.onsuccess = async function(e) {
+                    if(e.target.result) {
+                        inventory = e.target.result.value.inventory; zoneConfigs = e.target.result.value.configs || {};
+                        zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
+                        try { await reapplyPendingQueueLocally(); } catch(err) { console.warn('重新套用佇列失敗:', err); }
+                        autoCheckExpiredDaily(); renderAll();
+                    } else alert("本機無快取，請在連線時載入一次。");
+                    resolve();
+                };
+                req.onerror = () => { console.warn('讀取快取失敗'); resolve(); };
+                tx.onerror = () => { console.warn('快取交易失敗'); resolve(); };
+            } catch(err) { console.warn('loadFromLocalCache 例外:', err); resolve(); }
+        });
     }
 
     function renderAll() { renderVisual(); renderTable(false); }
@@ -448,6 +761,7 @@
         const grid = document.getElementById('visualGrid');
         let zone = document.getElementById('vZone').value, floor = document.getElementById('vFloor').value;
         if (zone === "冷藏庫-左") zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 };
+        if (zone === "冷藏庫-右") zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 };
         if (zone === "常溫區") zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
@@ -464,7 +778,14 @@
                 let baseColor = getZoneColor(zone);
                 if (items.some(item => (item.name || "").includes("(切)"))) slot.classList.add('status-cut'), baseColor = "var(--color-cut)";
                 else if (items.some(item => (item.note || "").includes("報廢"))) slot.classList.add('status-danger'), baseColor = "var(--danger)";
-                else if (items.some(item => (item.note || "").includes("異常"))) slot.classList.add('status-warning'), baseColor = "var(--warning)";
+                else if (items.some(item => {
+                    const n = item.note || "";
+                    return n.includes("產品盤點") || n.includes("產品異常") || n.includes("產品移位");
+                })) slot.classList.add('status-warning'), baseColor = "var(--warning)";
+                else if (items.some(item => {
+                    const n = item.note || "";
+                    return n.includes("需補貨") || n.includes("產品即期") || n.includes("產品出清");
+                })) slot.classList.add('status-group-b'), baseColor = "var(--color-restock)";
                 slot.style.backgroundColor = baseColor; slot.style.opacity = "1";
                 if (currentDateFilter !== 'all') {
                     slot.style.opacity = items.some(item => getItemDateRangeTag(item) === currentDateFilter && !(item.note || "").includes("報廢")) ? "1" : "0.15";
@@ -474,8 +795,21 @@
             slot.innerHTML = `<b>${i}</b><span class="count">${items.length}件</span>`; grid.appendChild(slot);
         }
         document.getElementById('floorEmptyCount').innerHTML = `🔲 空庫位: <span style="color:#22d3ee; font-size:15px;">${config.maxPos - occupied}</span> 格`;
-        let zoneItems = inventory.filter(i => i.zone === zone), uniqueLocs = new Set(zoneItems.map(i => `${i.floor}-${i.pos}`)).size;
-        document.getElementById('usageInfo').innerText = `使用率: ${((uniqueLocs/(config.maxPos*4))*100).toFixed(1)}%`;
+        const VALID_FLOORS = ['1F', '2F', '3F', '4F'];
+        const maxPos = config.maxPos;
+        let usedLocs = new Set();
+        inventory.forEach(it => {
+            if (it.zone !== zone) return;
+            if (!VALID_FLOORS.includes(it.floor)) return;
+            const p = Number(it.pos);
+            if (isNaN(p) || p < 1 || p > maxPos) return;
+            usedLocs.add(`${it.floor}-${p}`);
+        });
+        const totalSlots = maxPos * VALID_FLOORS.length;
+        let usagePct = totalSlots > 0 ? (usedLocs.size / totalSlots) * 100 : 0;
+        if (usagePct > 100) usagePct = 100;
+        if (usagePct < 0) usagePct = 0;
+        document.getElementById('usageInfo').innerText = `使用率: ${usagePct.toFixed(1)}%`;
     }
 
     function handleSort(field) {
@@ -486,10 +820,8 @@
     }
 
     async function handleRestock(id) {
-        // 1. 核心修正：使用 == (雙等號) 自動轉換型態比較，或強制轉字串，確保一定能找到該庫位資料
         const item = inventory.find(i => i.id.toString() === id.toString()); 
         
-        // 檢查防呆
         if (!item) { 
             alert("找不到此庫位資料，請重新整理網頁！"); 
             return; 
@@ -499,12 +831,10 @@
             return; 
         }
         
-        // 2. 核心修正：精準搜尋全庫「相同品名」產品，且「100% 排除當前本儲位自己」
         let otherItems = inventory.filter(i => 
             i.name === item.name && i.id.toString() !== item.id.toString()
         );
         
-        // 3. 生成同品在庫的軌跡文字
         let trackText = otherItems.length > 0 
             ? otherItems.map(i => `${i.zone}${i.floor}-${i.pos}`).join(', ') 
             : '無庫存';
@@ -513,7 +843,6 @@
 
         toggleLoader(true);
         
-        // 4. 將最新變更回寫至系統試算表 (Action: edit)
         await dispatchAction({ 
             action: 'edit', 
             id: item.id, 
@@ -522,26 +851,17 @@
             pos: item.pos, 
             name: item.name, 
             batch: item.batch || '', 
-            date: item.date ? item.date.split('T')[0] : '', 
+            date: item.date ? String(item.date).split('T')[0] : '', 
             note: newNote 
         });
         
-        // 5. 同步更新本地即時暫存資料，讓手機版字卡能即時感知
         item.note = newNote;
         
-        alert(`✅ 智慧補貨軌跡已寫入！`); 
-        
-        // 6. 重新整理資料或即時渲染畫面
-        if (!isOfflineMode) {
-            fetchData(); 
-        } else {
-            renderTable();
-            toggleLoader(false);
-        }
+        alert(`✅ 智慧補貨軌跡已寫入！`);
+        toggleLoader(false);
     }
 
-    /* 修正點 3：修正手機版 data-label="儲位位置" 內部的區域名稱顯示結構，多預留顯示空間防止文字被切斷 */
-  function renderTable(isExact = false) {
+    function renderTable(isExact = false) {
         const kw = document.getElementById('searchInput').value.toLowerCase();
         searchFilteredList = inventory.filter(i => {
             let fullPos = `${i.zone}${i.floor}-${i.pos}`.toLowerCase(), other = `${i.name}${i.batch}${i.note}`.toLowerCase();
@@ -576,9 +896,9 @@
                 <td class="td-select-cell" style="${isAdmin ? '' : 'display:none;'} text-align:center;"><input type="checkbox" class="row-select-box" value="${i.id}"></td>
                 <td data-label="儲位位置"><b style="color:${getZoneColor(i.zone)}">${i.floor}-${i.pos}</b><small style="color:${getZoneColor(i.zone)}; opacity: 0.85; font-weight: bold; margin-left: 5px;">${i.zone}</small></td>
                 <td data-label="產品內容"><b>${i.name}</b>${i.note ? `<span class="report-label">⚠️ ${i.note}</span>` : ''}</td>
-                <td data-label="有效日期">${i.date ? i.date.split('T')[0] : '-'}</td>
+                <td data-label="有效日期">${i.date ? String(i.date).split('T')[0] : '-'}</td>
                 <td data-label="批號碼"><code>${i.batch || '-'}</code></td>
-               <td data-label="備註狀態"><small style="max-width: 100% !important; white-space: normal !important; display: inline-block; word-break: break-all;">${i.note ? i.note : '正常'}</small></td>
+                <td data-label="備註狀態"><small style="max-width: 100% !important; white-space: normal !important; display: inline-block; word-break: break-all;">${i.note ? i.note : '正常'}</small></td>
                 <td data-label="功能操作">
                     <div class="action-btns">
                         <button class="btn-main" style="background:#475569; padding:6px 10px;" onclick="openReport('${i.id}')">回報</button>
@@ -615,14 +935,14 @@
     const toggleSelectAllRows = (master) => document.querySelectorAll('.row-select-box').forEach(cb => cb.checked = master.checked);
     function openReport(id) { currentId = id; document.getElementById('reportModal').style.display = 'flex'; }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
-    const toggleLoader = (s) => document.getElementById('loader').style.display = s ? 'flex' : 'none';
+    const toggleLoader = (s) => _origToggleLoader(s);
 
     function toggleAdmin() {
         if(!isAdmin) { 
             let p = prompt("管理金鑰:"); 
             if(p && btoa(p) === _KEY) { isAdmin=true; document.getElementById('admin-panel').style.display='block'; document.getElementById('th-select').style.display='table-cell'; document.getElementById('adminBtn').innerText="🔐 管理中"; } 
         } else { isAdmin=false; document.getElementById('admin-panel').style.display='none'; document.getElementById('th-select').style.display='none'; document.getElementById('adminBtn').innerText="🛠️ 管理員"; }
-        updateMarqueeTime(); renderTable(false);
+        updateMarqueeTime(false); renderTable(false);
     }
 
     function getFormFields(prefix) {
@@ -650,51 +970,117 @@
             payload = { action: 'add', ...getFormFields('add') };
         }
         await dispatchAction(payload);
-        if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        toggleLoader(false);
     }
 
     function openEdit(id) {
         const item = inventory.find(i => i.id.toString() === id.toString()); document.getElementById('editId').value = id; 
         ['Zone', 'Floor', 'Pos', 'Name', 'Batch', 'Note'].forEach(f => document.getElementById('edit' + f).value = item[f.toLowerCase()] || '');
-        document.getElementById('editDate').value = item.date ? item.date.split('T')[0] : '';
+        document.getElementById('editDate').value = item.date ? String(item.date).split('T')[0] : '';
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    async function deleteItem(id) { if(confirm("確定要刪除嗎？")) { toggleLoader(true); await dispatchAction({action:'delete', id}); if(!isOfflineMode) fetchData(); else toggleLoader(false); } }
+    async function deleteItem(id) { if(confirm("確定要刪除嗎？")) { toggleLoader(true); await dispatchAction({action:'delete', id}); toggleLoader(false); } }
 
     async function dispatchAction(payload) {
-        if (isOfflineMode || !navigator.onLine) {
-            return new Promise((resolve) => {
-                let tx = db.transaction("queue", "readwrite"); tx.objectStore("queue").add(payload);
-                if (payload.action === 'edit' || payload.action === 'report') {
-                    let idx = inventory.findIndex(i => i.id.toString() === payload.id.toString());
-                    if (idx !== -1) {
-                        if(payload.name) inventory[idx].name = payload.name; if(payload.batch) inventory[idx].batch = payload.batch; if(payload.date) inventory[idx].date = payload.date;
-                        if(payload.action === 'report') {
-                            let app = `[${payload.type}] ${payload.reason || ''}`; inventory[idx].note = inventory[idx].note ? (inventory[idx].note + " | " + app) : app;
-                        } else if(payload.note) inventory[idx].note = payload.note;
-                    }
-                } else if (payload.action === 'delete') inventory = inventory.filter(i => i.id.toString() !== payload.id.toString());
-                else if (payload.action === 'add') { payload.id = "local_" + Date.now(); inventory.push(payload); }
-                renderAll(); resolve({ success: true, offline: true });
-            });
+        updateMarqueeTime(true); 
+        if (payload.action === 'add' && !payload.id) {
+            payload.id = "local_" + Date.now() + "_" + Math.floor(Math.random()*10000);
         }
-        return (await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })).json();
+        applyActionToLocal(payload);
+        if (db) await enqueueAction(payload);
+        renderAll();
+        if (!isOfflineMode && navigator.onLine && db) {
+            syncOfflineQueue();
+        }
+        return { success: true, queued: true };
     }
 
     async function syncOfflineQueue() {
-        if (!db) return;
-        db.transaction("queue", "readonly").objectStore("queue").getAll().onsuccess = async function(e) {
-            let items = e.target.result;
-            if (items && items.length > 0) {
-                toggleLoader(true);
-                for (let item of items) {
-                    try { let localId = item.id; delete item.id; await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(item) }); db.transaction("queue", "readwrite").objectStore("queue").delete(localId); } 
-                    catch(err) { console.log("同步失敗", err); }
+        if (!db || isSyncing || isOfflineMode || !navigator.onLine) return;
+        const items = await getAllQueuedActions();
+        if (items.length === 0) { updatePendingBadge(); return; }
+
+        isSyncing = true;
+        document.getElementById('marqueeDisplay').innerText = `🔄 正在同步 ${items.length} 筆離線變更至雲端...`;
+
+        let successCount = 0, failCount = 0;
+        items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        try {
+            for (let item of items) {
+                if (!item.payload || typeof item.payload !== 'object') {
+                    console.warn('偵測到舊格式佇列記錄，自動清除:', item);
+                    try { await removeQueuedAction(item.queueId || item.id); } catch(e) {}
+                    continue;
                 }
-                fetchData();
+
+                const queueId = item.queueId;
+                const originalPayload = item.payload;
+                let serverPayload = { ...originalPayload };
+
+                if (serverPayload.id && localIdMap[serverPayload.id]) {
+                    serverPayload.id = localIdMap[serverPayload.id];
+                }
+
+                if (serverPayload.action === 'delete' && String(serverPayload.id).startsWith('local_')) {
+                    await removeQueuedAction(queueId);
+                    successCount++;
+                    continue;
+                }
+
+                if ((serverPayload.action === 'edit' || serverPayload.action === 'report')
+                    && String(serverPayload.id).startsWith('local_')
+                    && !localIdMap[serverPayload.id]) {
+                    continue;
+                }
+
+                let res;
+                try {
+                    const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(serverPayload) });
+                    res = await r.json();
+                } catch (netErr) {
+                    failCount++;
+                    break; 
+                }
+
+                if (res && res.success !== false) {
+                    if (originalPayload.action === 'add' && res.id) {
+                        await saveIdMapping(originalPayload.id, res.id);
+                        let idx = inventory.findIndex(i => String(i.id) === String(originalPayload.id));
+                        if (idx !== -1) inventory[idx].id = res.id;
+                    }
+                    await removeQueuedAction(queueId);
+                    successCount++;
+                } else {
+                    failCount++;
+                    break; 
+                }
             }
-        };
+        } catch (err) {
+            console.error('syncOfflineQueue 例外:', err);
+        } finally {
+            isSyncing = false;
+            try { await updatePendingBadge(); } catch(e) {}
+        }
+
+        if (successCount > 0) {
+            try { await fetchData(); } catch(e) { console.warn('同步後刷新失敗:', e); }
+            if (failCount === 0) {
+                showSyncToast(`✅ 已成功同步 ${successCount} 筆離線變更至雲端！`);
+                document.getElementById('marqueeDisplay').innerText = `✅ 離線暫存 ${successCount} 筆已全數同步至雲端，資料已刷新。`;
+            } else {
+                showSyncToast(`⚠️ 同步 ${successCount} 筆成功，${failCount} 筆待重試`, 'warning');
+                document.getElementById('marqueeDisplay').innerText = `⚠️ 部分同步成功 (${successCount} 筆)，剩餘 ${failCount} 筆將自動重試。`;
+                clearTimeout(autoRetryTimer);
+                autoRetryTimer = setTimeout(() => { if (!isOfflineMode && navigator.onLine) syncOfflineQueue(); }, 30000);
+            }
+        } else if (failCount > 0) {
+            showSyncToast(`❌ 同步失敗，將於 30 秒後自動重試`, 'error');
+            document.getElementById('marqueeDisplay').innerText = `❌ 同步失敗，將於 30 秒後自動重試。`;
+            clearTimeout(autoRetryTimer);
+            autoRetryTimer = setTimeout(() => { if (!isOfflineMode && navigator.onLine) syncOfflineQueue(); }, 30000);
+        }
     }
 
     async function executeBatchMove() {
@@ -704,16 +1090,16 @@
         toggleLoader(true);
         for(let cb of boxes) {
             let item = inventory.find(i => i.id.toString() === cb.value.toString());
-            if(item) await dispatchAction({ action: 'edit', id: item.id, zone: tZone, floor: tFloor, pos: tPos, name: item.name, batch: item.batch || '', date: item.date ? item.date.split('T')[0] : '', note: item.note || '' });
+            if(item) await dispatchAction({ action: 'edit', id: item.id, zone: tZone, floor: tFloor, pos: tPos, name: item.name, batch: item.batch || '', date: item.date ? String(item.date).split('T')[0] : '', note: item.note || '' });
         }
-        document.getElementById('selectAllBox').checked = false; if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        document.getElementById('selectAllBox').checked = false; toggleLoader(false);
     }
 
     async function executeBatchDelete() {
         const boxes = document.querySelectorAll('.row-select-box:checked'); if(!boxes.length) { alert("請先勾選品項！"); return; }
         if(!confirm(`⚠️ 確定刪除這 ${boxes.length} 筆項目嗎？`)) return;
         toggleLoader(true); for(let cb of boxes) await dispatchAction({ action: 'delete', id: cb.value });
-        document.getElementById('selectAllBox').checked = false; if(!isOfflineMode) fetchData(); else toggleLoader(false);
+        document.getElementById('selectAllBox').checked = false; toggleLoader(false);
     }
 
     function initTouchEvents() {
@@ -753,97 +1139,19 @@
         if(!row || window.innerWidth > 768 || e.target.closest('button,input,a')) return;
         row.classList.toggle('expanded');
     });
-
-/* ===== V29.2 Stable Batch Center ===== */
-window.selectedRowsGlobal = new Set(
- JSON.parse(localStorage.getItem('selectedRowsGlobal') || '[]')
-);
-
-
-function updateCartCount(){
- const c=document.getElementById('v30Count');
- if(c) c.textContent=(window.selectedRowsGlobal?window.selectedRowsGlobal.size:0);
-}
-
-function saveSelectedRows(){
- localStorage.setItem('selectedRowsGlobal', JSON.stringify([...window.selectedRowsGlobal]));
-
- updateCartCount();
-}
-
-document.addEventListener('change', function(e){
- if(e.target.classList.contains('row-select-box')){
-   if(e.target.checked) window.selectedRowsGlobal.add(String(e.target.value));
-   else window.selectedRowsGlobal.delete(String(e.target.value));
-   saveSelectedRows();
- }
-});
-
-function syncCheckboxes(){
- document.querySelectorAll('.row-select-box').forEach(cb=>{
-   cb.checked = window.selectedRowsGlobal.has(String(cb.value));
- });
-}
-
-const __oldRenderTable = renderTable;
-renderTable = function(isExact=false){
- __oldRenderTable(isExact);
- syncCheckboxes();
-};
-
-function selectAllSearchResults(){
- searchFilteredList.forEach(i=>window.selectedRowsGlobal.add(String(i.id)));
- saveSelectedRows();
- syncCheckboxes();
- alert(`已全選 ${searchFilteredList.length} 筆資料`);
-}
-
-function clearAllSelections(){
- window.selectedRowsGlobal.clear();
- saveSelectedRows();
- syncCheckboxes();
- const m=document.getElementById('selectAllBox');
- if(m) m.checked=false;
- alert('已清除全部勾選');
-}
-
-function exportSelectedExcel(){
- const data=inventory.filter(i=>window.selectedRowsGlobal.has(String(i.id)));
- if(!data.length){ alert('請先勾選資料'); return; }
-
- let template=`<html><head><meta charset="UTF-8"></head><body><table border="1">
- <tr><th>區域</th><th>樓層</th><th>儲位</th><th>產品</th><th>效期</th><th>批號</th><th>備註</th></tr>
- ${data.map(i=>`<tr>
- <td>${i.zone||''}</td><td>${i.floor||''}</td><td>${i.pos||''}</td>
- <td>${i.name||''}</td><td>${i.date||''}</td><td>${i.batch||''}</td><td>${i.note||''}</td>
- </tr>`).join('')}
- </table></body></html>`;
-
- let blob=new Blob([template],{type:'application/vnd.ms-excel'});
- let a=document.createElement('a');
- a.href=URL.createObjectURL(blob);
- a.download='V29.2_勾選資料.xls';
- a.click();
-}
-
-</script>
-
-<style>
-#v30Fab{position:fixed;right:16px;bottom:16px;z-index:9999;padding:10px 14px;border-radius:10px}
-#v30Drawer{position:fixed;top:0;right:-320px;width:300px;height:100%;background:#fff;z-index:9998;transition:right .25s;overflow:auto;box-shadow:-2px 0 8px rgba(0,0,0,.2);padding:10px}
-#v30Drawer.open{right:0}
-</style>
-<button id="v30Fab" onclick="v30ToggleDrawer()"> ☑已選 <span id="v30Count">0</span></button>
-<div id="v30Drawer"><h3>V30 暫存籃</h3><p>使用 V29.2 原有勾選功能。</p></div>
-<script>
-function v30ToggleDrawer(){
- const d=document.getElementById('v30Drawer');
- if(d)d.classList.toggle('open');
-}
-window.addEventListener('load',()=>{
- const c=document.getElementById('v30Count');
- if(c && window.selectedRowsGlobal){ c.textContent=window.selectedRowsGlobal.size; updateCartCount(); }
-});
 </script>
 </body>
+<!-- 側邊欄區塊 -->
+<div class="sidebar">
+    <h3>導覽選單</h3>
+    <ul>
+        <li><a href="https://mingfonglpg-bit.github.io/-1-1/mobile1.html">切換版面</a></li>
+        
+        <!-- 插入你的側邊欄網址 -->
+        <li><a href="https://mingfonglpg-bit.github.io/-1-1/board.html" target="_blank">庫位看板</a></li>
+        
+        <li><a href="https://line.me/ti/p/~@096ldhnp">倉儲AI助理</a></li>
+    </ul>
+</div>
+
 </html>
