@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📊 倉儲庫位即時狀態看板 (對稱滿版)</title>
+    <style>
+        :root { 
+            --primary: #6366f1; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
+            --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.1);
+            --stat-num: #fbbf24;
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: 'Inter', "Noto Sans TC", sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 10px; 
+            font-size: 15px;
+            width: 100vw;
+            overflow-x: hidden;
+        }
+        
+        /* 100% 全螢幕延伸滿版面 */
+        .container { 
+            width: 100%;
+            max-width: 100%; 
+            margin: 0; 
+            background: var(--card-bg); 
+            backdrop-filter: blur(20px); 
+            padding: 20px; 
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+        @media (min-width: 768px) {
+            .container { padding: 30px; border-radius: 20px; }
+        }
+        
+        /* 📱 看板網格布局 - 預設手機版 (雙欄排版) */
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 12px; 
+            margin-bottom: 20px; 
+        }
+        #card-常溫區 { grid-column: span 2; } /* 手機版常溫區在最下層滿版 */
+
+        /* 💻 看板網格布局 - 電腦大螢幕版 (全新黃金比例排版) */
+        @media (min-width: 1024px) {
+            .dashboard { 
+                grid-template-columns: repeat(4, 1fr); /* 切分為 4 等分欄位 */
+                grid-template-rows: auto auto;         /* 建立上下兩列 */
+                gap: 20px; 
+            }
+            
+            /* 定位冷凍與冷藏的相對位置 */
+            #card-極冷庫-左 { grid-column: 1; grid-row: 1; }
+            #card-極冷庫-右 { grid-column: 2; grid-row: 1; }
+            #card-冷藏庫-左 { grid-column: 1; grid-row: 2; }
+            #card-冷藏庫-右 { grid-column: 2; grid-row: 2; }
+            
+            /* 📢 重點修改：常溫區獨佔右側，並且垂直跨越 1、2 兩列 */
+            #card-常溫區 { 
+                grid-column: 3 / span 2; /* 佔據右邊第 3、4 欄 */
+                grid-row: 1 / span 2;    /* 縱向跨越 2 列，高度完美切齊左邊 */
+                height: 100%;            /* 撐滿整個高度 */
+            }
+        }
+        
+        /* 統計卡片外框 */
+        .stat-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            border: 1px solid var(--border); 
+            padding: 25px 15px; 
+            border-radius: 20px; 
+            text-align: center; 
+            cursor: pointer; 
+            user-select: none; 
+            transition: all 0.2s ease; 
+            position: relative; 
+            min-height: 200px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+        }
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        /* 卡片主標題 */
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 卡片右上角關閉按鈕 */
+        .card-close-btn { 
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            color: var(--text-dim); 
+            font-size: 14px; 
+            padding: 6px;
+            cursor: pointer; 
+            z-index: 10; 
+        }
+        .card-close-btn:hover { color: var(--danger); }
+        
+        /* 核心大總數數字 (常溫區放大版相容) */
+        .stat-value { 
+            font-size: 52px; 
+            font-weight: 900; 
+            color: var(--edit); 
+            margin: 10px 0;
+            text-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        /* 1-4F 樓層細節大字體區塊 */
+        .floor-detail { 
+            font-size: 18px; 
+            color: var(--text-dim); 
+            line-height: 1.8; 
+            border-top: 1px solid var(--border); 
+            padding-top: 12px; 
+            margin-top: 12px; 
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+        
+        /* 1-4F 樓層細節內獨立的剩餘數字 */
+        .stat-num-highlight { 
+            color: var(--stat-num); 
+            font-weight: 800; 
+            font-size: 22px; 
+            margin-left: 2px;
+            margin-right: 2px;
+        }
+
+        /* 跑馬燈樣式 */
+        .marquee-wrapper {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+        .marquee-content {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 18s linear infinite;
+            color: var(--warning);
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        @keyframes marquee {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        /* 控制按鈕 */
+        .control-panel {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn-refresh {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn-refresh:active { transform: scale(0.98); opacity: 0.9; }
+
+        /* 雲端狀態提示條 */
+        #cloud-status-toast {
+            position: fixed; top: 20px; right: 20px; background: rgba(16, 185, 129, 0.9);
+            color: white; padding: 12px 24px; border-radius: 10px; z-index: 999;
+            font-weight: bold; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div id="cloud-status-toast">☁️ 雲端資料同步中...</div>
+
+<div class="container">
+    <!-- 功能控制列 -->
+    <div class="control-panel">
+        <button class="btn-refresh" onclick="enterSystem()">🔄 重新整理數據</button>
+    </div>
+
+    <!-- 數據看板核心網格 (已套用全新左右對稱布局) -->
+    <div class="dashboard">
+        <!-- 上排左：冷凍庫-左 -->
+        <div class="stat-card" id="card-極冷庫-left" style="display: none;"></div> <!-- 保留相容隱藏節點 -->
+        <div class="stat-card" id="card-極冷庫-左" onclick="toggleCardDetail('極冷庫-左')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-左')">✖</span>
+            <div class="card-title">冷凍左空位 <span id="arrow-極冷庫-開">▼</span></div>
+            <div id="empty-極冷庫-開" class="stat-value">--</div> 
+            <div id="detail-極冷庫-左" class="floor-detail"></div>
+        </div>
+        
+        <!-- 上排右：冷凍庫-右 -->
+        <div class="stat-card" id="card-極冷庫-右" onclick="toggleCardDetail('極冷庫-右')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '極冷庫-右')">✖</span>
+            <div class="card-title">冷凍右空位 <span id="arrow-極冷庫-右">▼</span></div>
+            <div id="empty-極冷庫-右" class="stat-value">--</div>
+            <div id="detail-極冷庫-右" class="floor-detail"></div>
+        </div>
+        
+        <!-- 下排左：冷藏庫-左 -->
+        <div class="stat-card" id="card-冷藏庫-左" onclick="toggleCardDetail('冷藏庫-左')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-left')">✖</span> 
+            <div class="card-title">冷藏左空位 <span id="arrow-冷藏庫-左">▼</span></div>
+            <div id="empty-冷藏庫-左" class="stat-value">--</div>
+            <div id="detail-冷藏庫-左" class="floor-detail"></div>
+        </div>
+        
+        <!-- 下排右：冷藏庫-右 -->
+        <div class="stat-card" id="card-冷藏庫-右" onclick="toggleCardDetail('冷藏庫-右')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '冷藏庫-right')">✖</span> 
+            <div class="card-title">冷藏右空位 <span id="arrow-冷藏庫-右">▼</span></div>
+            <div id="empty-冷藏庫-右" class="stat-value">--</div>
+            <div id="detail-冷藏庫-右" class="floor-detail"></div>
+        </div>
+        
+        <!-- 右側縱向大卡片：常溫區 (電腦版自動頂天立地) -->
+        <div class="stat-card" id="card-常溫區" onclick="toggleCardDetail('常溫區')">
+            <span class="card-close-btn" onclick="closeStatCard(event, '常溫區')">✖</span>
+            <div class="card-title">常溫區空位 <span id="arrow-常溫區">▼</span></div>
+            <!-- 讓縱向卡片的關鍵數字在視覺上更舒適居中 -->
+            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                <div id="empty-常溫區" class="stat-value" style="font-size: 64px;">--</div>
+            </div>
+            <div id="detail-常溫區" class="floor-detail"></div>
+        </div>
+    </div>
+
+    <!-- 跑馬燈提示 -->
+    <div class="marquee-wrapper">
+        <div class="marquee-content">📢 倉儲庫位即時看板</div>
+    </div>
+</div>
+
+<script>
+    // 雲端 API 節點
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec";
+
+    let inventory = [];
+    let hiddenCardDetails = new Set();
+    let closedCards = new Set(); 
+
+    // 初始化自動連線
+    window.addEventListener('DOMContentLoaded', () => {
+        enterSystem();
+    });
+
+    function showToast(text, duration = 2000) {
+        const toast = document.getElementById('cloud-status-toast');
+        toast.innerText = text;
+        toast.style.display = 'block';
+        if (duration > 0) {
+            setTimeout(() => { toast.style.display = 'none'; }, duration);
+        }
+    }
+    
+    function hideToast() { document.getElementById('cloud-status-toast').style.display = 'none'; }
+
+    // 從雲端 API 載入庫存數據
+    async function enterSystem() {
+        showToast("☁️ 正在連線下載雲端庫存...", 0);
+        try {
+            const response = await fetch(`${SCRIPT_URL}?action=read`);
+            if (!response.ok) throw new Error("連線錯誤");
+            const resData = await response.json();
+            if (resData.status === "success") {
+                inventory = resData.data.map(item => ({
+                    ...item,
+                    id: parseInt(item.id)
+                }));
+            } else {
+                throw new Error("讀取失敗");
+            }
+        } catch (error) {
+            console.error("無法連線至雲端，載入本地暫存檔案:", error);
+            const saved = localStorage.getItem('offlineData_V23_7');
+            if(saved) { inventory = JSON.parse(saved); }
+        } finally {
+            hideToast();
+            updateStats(); 
+        }
+    }
+
+    // 計算各區域、各樓層的剩餘空位數據並渲染
+    function updateStats() {
+        // 各區域特定的每層庫位數設定 (維持先前修改設定)
+        const zones = [
+            { dataKey: "極冷庫-左", domKey: "極冷庫-開", actualDom: "極冷庫-左", slots: 22 }, 
+            { dataKey: "極冷庫-右", domKey: "極冷庫-右", actualDom: "極冷庫-右", slots: 22 }, 
+            { dataKey: "冷藏庫-left", domKey: "冷藏庫-左", actualDom: "冷藏庫-左", slots: 17 }, // 17個
+            { dataKey: "冷藏庫-right", domKey: "冷藏庫-右", actualDom: "冷藏庫-右", slots: 14 }, // 14個
+            { dataKey: "常溫區",   domKey: "常溫區",   actualDom: "常溫區",   slots: 5  }  // 5個
+        ];
+
+        zones.forEach(z => {
+            const dataZone = z.dataKey;
+            const domZone = z.domKey;
+            const actZone = z.actualDom;
+            const maxSlotsPerFloor = z.slots; 
+            const totalCapacity = maxSlotsPerFloor * 4; 
+
+            // 精準抓取對應卡片元件
+            const cardEl = document.getElementById(`card-${actZone}`);
+            if (closedCards.has(actZone) || closedCards.has(domZone)) { 
+                if (cardEl) cardEl.style.display = 'none'; 
+                return; 
+            } else { 
+                if (cardEl) cardEl.style.display = 'flex'; 
+            }
+
+            let totalOcc = 0; 
+            let floorDetails = [];
+
+            // 統計 1F 到 4F 每一層的佔用狀況 (相容多鍵名對齊)
+            ["1F","2F","3F","4F"].forEach(f => { 
+                let floorOcc = 0;
+                for(let i = 1; i <= maxSlotsPerFloor; i++) {
+                    if(inventory.some(x => x.fullPos === `${actZone}${f}-${i}` || x.fullPos === `${dataZone}${f}-${i}`)) { 
+                        floorOcc++; 
+                        totalOcc++; 
+                    }
+                }
+                floorDetails.push(`${f}:<span class="stat-num-highlight">${maxSlotsPerFloor - floorOcc}</span>`);
+            });
+            
+            // 處理空位總數顯示
+            const emptyTargetId = (actZone === "極冷庫-左") ? "empty-極冷庫-開" : `empty-${actZone}`;
+            const targetEmptyEl = document.getElementById(emptyTargetId);
+            if(targetEmptyEl) {
+                targetEmptyEl.innerText = totalCapacity - totalOcc; 
+            }
+            
+            // 處理樓層細節展開收合
+            const detailEl = document.getElementById(`detail-${actZone}`);
+            if(detailEl) {
+                detailEl.innerHTML = floorDetails.join(" | ");
+                detailEl.style.display = (hiddenCardDetails.has(actZone) || hiddenCardDetails.has(domZone)) ? 'none' : 'block';
+                
+                const arrowTargetId = (actZone === "極冷庫-開" || actZone === "極冷庫-左") ? "arrow-極冷庫-開" : `arrow-${actZone}`;
+                const arrowEl = document.getElementById(arrowTargetId);
+                if(arrowEl) arrowEl.innerText = (hiddenCardDetails.has(actZone) || hiddenCardDetails.has(domZone)) ? '▶' : '▼';
+            }
+        });
+    }
+
+    // 控制詳細資訊的收合 (雙向代稱相容修正)
+    function toggleCardDetail(zoneName) {
+        let key = zoneName;
+        if (zoneName === '冷藏庫-left') key = '冷藏庫-左';
+        if (zoneName === '冷藏庫-right') key = '冷藏庫-右';
+
+        if (hiddenCardDetails.has(key)) {
+            hiddenCardDetails.delete(key);
+        } else {
+            hiddenCardDetails.add(key);
+        }
+        updateStats();
+    }
+
+    // 關閉看板卡片功能
+    function closeStatCard(event, zoneName) {
+        event.stopPropagation(); 
+        let key = zoneName;
+        if (zoneName === '冷藏庫-left') key = '冷藏庫-左';
+        if (zoneName === '冷藏庫-right') key = '冷藏庫-右';
+        closedCards.add(key); 
+        updateStats();
+    }
+</script>
+</body>
+</html>
