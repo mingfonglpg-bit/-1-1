@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V28.1 (智慧預警折疊修復版)</title>
+    <title>⚡ 倉儲庫位控管系統 V28.1.1</title>
     <style>
         /* ============ 全域色彩／變數設定 ============
            統一定義主色、警告色、危險色、背景色等，之後所有樣式都透過
@@ -366,7 +366,7 @@
     /* ============ 全域設定與狀態變數 ============ */
     // 後端資料來源：Google Apps Script 部署的 Web App 網址（讀取/寫入庫存資料）
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGRptsGHH3MLrl4eU0UsCQ4lvxGE5goP3VF_FntVevNrG31h8VtXhjoYSpO56IYA_T/exec"; 
-    // [檢查] 管理員金鑰只是 Base64("admin123") 的前端比對，並非真正安全機制，
+    // [檢查] 管理員金鑰只是 Base64("") 的前端比對，並非真正安全機制，
     // 任何人打開瀏覽器開發者工具都能看到明碼，僅適合當「操作防呆」使用。
     const _KEY = "YWRtaW4xMjM="; 
     let inventory = [], zoneConfigs = {}, isAdmin = false, currentId = null; // 目前庫存資料、各區域格局設定、是否為管理員、目前操作中的資料 id
