@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Supabase Auth 測試</title>
   <!-- 引入 Supabase CDN -->
-  <script src="https://jsdelivr.net"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -20,7 +20,12 @@
     <input type="email" id="email" placeholder="電子郵件"><br><br>
     <input type="password" id="password" placeholder="密碼"><br><br>
     <button onclick="handleSignUp()">註冊帳號</button>
-    <button onclick="handleSignIn()">登入</button>
+    <button onclick="handleSignIn()">密碼登入</button>
+    
+    <hr>
+    <h4>第三方快速登入</h4>
+    <button onclick="loginWithGitHub()" style="background: #24292e; color: white; padding: 5px 10px; cursor: pointer;">使用 GitHub 登入</button>
+    <button onclick="loginWithGoogle()" style="background: #4285f4; color: white; padding: 5px 10px; cursor: pointer;">使用 Google 登入</button>
   </div>
 
   <!-- 登出面板 -->
@@ -31,10 +36,13 @@
   </div>
 
   <script>
-    // 1. 初始化 Supabase 客戶端
+    // ⚠️ 請務必將下方填入你自己的 Supabase 憑證
     const SUPABASE_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co/'
     const SUPABASE_KEY = 'sb_publishable_EyMi73We81FY_uTwyxfVTA_D2go1RSD'
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    // 💡 【修正 BUG】正確的 CDN 初始化寫法
+    const { createClient } = supabase 
+    const client = createClient(SUPABASE_URL, SUPABASE_KEY)
 
     // 取得 DOM 元素
     const authStatus = document.getElementById('auth-status')
@@ -42,51 +50,58 @@
     const userPanel = document.getElementById('user-panel')
     const userIdSpan = document.getElementById('user-id')
 
-    // 2. 監聽驗證狀態改變
-    supabase.auth.onAuthStateChange((event, session) => {
+    // 監聽驗證狀態改變
+    client.auth.onAuthStateChange((event, session) => {
       if (session) {
-        // 使用者已登入
-        authStatus.innerText = `目前狀態：已登入 (${session.user.email})`
+        authStatus.innerText = `目前狀態：已登入 (${session.user.email || '第三方登入'})`
         userIdSpan.innerText = session.user.id
         authForm.style.display = 'none'
         userPanel.style.display = 'block'
       } else {
-        // 使用者未登入
         authStatus.innerText = '目前狀態：未登入'
         authForm.style.display = 'block'
         userPanel.style.display = 'none'
       }
     })
 
-    // 3. 實作註冊
+    // 實作註冊
     async function handleSignUp() {
       const email = document.getElementById('email').value
       const password = document.getElementById('password').value
-      
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      
-      if (error) {
-        alert('註冊失敗: ' + error.message)
-      } else {
-        alert('註冊成功！若有啟用信箱驗證，請至信箱點擊驗證連結。')
-      }
+      const { data, error } = await client.auth.signUp({ email, password })
+      if (error) alert('註冊失敗: ' + error.message)
+      else alert('註冊成功！請檢查信箱或嘗試登入')
     }
 
-    // 4. 實作登入
+    // 實作登入
     async function handleSignIn() {
       const email = document.getElementById('email').value
       const password = document.getElementById('password').value
-      
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      
-      if (error) {
-        alert('登入失敗: ' + error.message)
-      }
+      const { data, error } = await client.auth.signInWithPassword({ email, password })
+      if (error) alert('登入失敗: ' + error.message)
     }
 
-    // 5. 實作登出
+    // GitHub 登入
+    async function loginWithGitHub() {
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: window.location.origin }
+      })
+      if (error) alert('GitHub 登入失敗: ' + error.message)
+    }
+
+    // Google 登入
+    async function loginWithGoogle() {
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin }
+      })
+      if (error) alert('Google 登入失敗: ' + error.message)
+    }
+
+    // 實作登出
     async function handleSignOut() {
-      const { error } = await supabase.auth.signOut()
+      const { error } = await client.auth.signOut()
       if (error) alert('登出失敗: ' + error.message)
     }
   </script>
