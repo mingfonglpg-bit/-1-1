@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Supabase Auth 測試</title>
+  <!-- 引入 Supabase CDN -->
+  <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+  <h1>Supabase 身份驗證測試</h1>
+
+  <!-- 狀態顯示 -->
+  <div id="auth-status">載入中...</div>
+  <hr>
+
+  <!-- 登入與註冊表單 -->
+  <div id="auth-form" style="display: none;">
+    <h3>註冊 / 登入</h3>
+    <input type="email" id="email" placeholder="電子郵件"><br><br>
+    <input type="password" id="password" placeholder="密碼"><br><br>
+    <button onclick="handleSignUp()">註冊帳號</button>
+    <button onclick="handleSignIn()">登入</button>
+  </div>
+
+  <!-- 登出面板 -->
+  <div id="user-panel" style="display: none;">
+    <h3>歡迎回來！</h3>
+    <p>你的 User ID: <span id="user-id"></span></p>
+    <button onclick="handleSignOut()">登出</button>
+  </div>
+
+  <script>
+    // 1. 初始化 Supabase 客戶端
+    const SUPABASE_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co/'
+    const SUPABASE_KEY = 'sb_publishable_EyMi73We81FY_uTwyxfVTA_D2go1RSD'
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    // 取得 DOM 元素
+    const authStatus = document.getElementById('auth-status')
+    const authForm = document.getElementById('auth-form')
+    const userPanel = document.getElementById('user-panel')
+    const userIdSpan = document.getElementById('user-id')
+
+    // 2. 監聽驗證狀態改變
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        // 使用者已登入
+        authStatus.innerText = `目前狀態：已登入 (${session.user.email})`
+        userIdSpan.innerText = session.user.id
+        authForm.style.display = 'none'
+        userPanel.style.display = 'block'
+      } else {
+        // 使用者未登入
+        authStatus.innerText = '目前狀態：未登入'
+        authForm.style.display = 'block'
+        userPanel.style.display = 'none'
+      }
+    })
+
+    // 3. 實作註冊
+    async function handleSignUp() {
+      const email = document.getElementById('email').value
+      const password = document.getElementById('password').value
+      
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      
+      if (error) {
+        alert('註冊失敗: ' + error.message)
+      } else {
+        alert('註冊成功！若有啟用信箱驗證，請至信箱點擊驗證連結。')
+      }
+    }
+
+    // 4. 實作登入
+    async function handleSignIn() {
+      const email = document.getElementById('email').value
+      const password = document.getElementById('password').value
+      
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
+      if (error) {
+        alert('登入失敗: ' + error.message)
+      }
+    }
+
+    // 5. 實作登出
+    async function handleSignOut() {
+      const { error } = await supabase.auth.signOut()
+      if (error) alert('登出失敗: ' + error.message)
+    }
+  </script>
+</body>
+</html>
