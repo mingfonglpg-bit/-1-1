@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>儲位視覺化管理系統</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+    body { padding: 20px; background-color: #f4f6f9; color: #333; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .role-selector { display: flex; gap: 10px; align-items: center; }
+    
+    .main-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    
+    /* 儲位視覺化圖譜 */
+    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .grid-title { margin-bottom: 15px; font-size: 18px; font-weight: bold; }
+    .storage-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .slot-card { border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; background-color: #ffffff; }
+    .slot-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .slot-card.favorite { border-color: #f59e0b; background-color: #fffbeb; }
+    .fav-badge { position: absolute; top: 5px; right: 5px; font-size: 14px; }
+    .slot-id { font-weight: bold; font-size: 16px; }
+    .slot-status { font-size: 12px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin: 4px 0; background: #e2e8f0; }
+
+    /* 控制面板與數據表格 */
+    .panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .btn { padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-secondary { background: #64748b; color: white; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 彈出視窗 Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-overlay.active { display: flex; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 420px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    
+    /* 要求 4: 右上角新增 X 按鈕 */
+    .close-btn { position: absolute; top: 12px; right: 15px; font-size: 22px; font-weight: bold; color: #64748b; cursor: pointer; border: none; background: none; line-height: 1; }
+    .close-btn:hover { color: #000; }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; margin-bottom: 4px; font-size: 14px; color: #475569; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; }
+    .countdown-text { color: #d97706; font-weight: bold; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>儲位視覺化管理系統</h2>
+    <div class="role-selector">
+      <label>當前權限切換：</label>
+      <select id="roleSelect" onchange="switchRole()">
+        <option value="operator">操作員 (Operator)</option>
+        <option value="admin">管理員 (Admin)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <!-- 左側：儲位視覺化圖譜 -->
+    <div class="grid-container">
+      <div class="grid-title">儲位視覺化圖譜 (點擊儲位開啟對應操作)</div>
+      <div class="storage-grid" id="storageGrid"></div>
+    </div>
+
+    <!-- 右側：資料預覽與快速功能區 -->
+    <div class="panel">
+      <h3 style="margin-bottom:15px;">儲位詳細資訊</h3>
+      <div id="quickInfo">請點擊左側儲位查看詳情</div>
+    </div>
+  </div>
+
+  <!-- 回報與編輯視窗 (Modal) -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content">
+      <!-- 要求 4: 右上角 X 關閉視窗 -->
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+      
+      <h3 id="modalTitle" style="margin-bottom: 15px;">儲位狀態回報與管理</h3>
+      
+      <div class="form-group">
+        <label>儲位編號</label>
+        <input type="text" id="modalSlotId" readonly style="background: #f1f5f9;">
+      </div>
+
+      <!-- 要求 5: 熟成時間欄位倒數顯示 -->
+      <div class="form-group">
+        <label>熟成時間 (倒數計時)</label>
+        <div id="modalAgingCountdown" class="countdown-text">計算中...</div>
+      </div>
+
+      <!-- 要求 2: 管理員編輯狀態欄 -->
+      <div class="form-group">
+        <label>狀態欄位</label>
+        <select id="modalStatusSelect" disabled>
+          <option value="空儲位">空儲位</option>
+          <option value="熟成中">熟成中</option>
+          <option value="待補貨">待補貨</option>
+          <option value="已完工">已完工</option>
+        </select>
+      </div>
+
+      <!-- 要求 2: 管理員編輯備註欄位 -->
+      <div class="form-group">
+        <label>備註內容</label>
+        <textarea id="modalNoteText" rows="3" disabled placeholder="備註內容..."></textarea>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap;">
+        <!-- 要求 1: 操作員套用我的最愛顏色 -->
+        <button class="btn btn-warning" onclick="toggleFavoriteCurrent()">套用/切換最愛色彩</button>
+
+        <!-- 要求 3: 補貨功能不打字 直接結果入備註 -->
+        <button class="btn btn-primary" onclick="triggerReplenish()">一鍵補貨回報</button>
+
+        <!-- 要求 2: 管理員保存與刪除功能 -->
+        <button class="btn btn-primary admin-only" id="saveAdminBtn" onclick="saveAdminChanges()" style="display:none;">儲存修改</button>
+        <button class="btn btn-danger admin-only" id="deleteBtn" onclick="deleteSlotData()" style="display:none;">刪除儲位資料</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 預設資料集 (45天熟成倒數)
+    let storageData = Array.from({ length: 10 }, (_, i) => {
+      const slotId = `A-${(i + 1).toString().padStart(2, '0')}`;
+      // 設定目標熟成結束時間 (目前時間 + (45 - i*3) 天)
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + (45 - i * 3));
+      
+      return {
+        id: slotId,
+        status: i % 3 === 0 ? '待補貨' : '熟成中',
+        note: i % 3 === 0 ? '系統提示：需盡速補貨' : '常規熟成存放',
+        isFavorite: false,
+        favoriteColor: '#f59e0b', // 我的最愛顯色
+        targetAgingDate: targetDate.getTime()
+      };
+    });
+
+    let currentRole = 'operator';
+    let selectedSlotId = null;
+
+    // 初始化與畫面的繪製
+    function init() {
+      renderGrid();
+      startCountdownTimer();
+    }
+
+    // 渲染視覺化圖譜
+    function renderGrid() {
+      const gridContainer = document.getElementById('storageGrid');
+      gridContainer.innerHTML = '';
+
+      storageData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = `slot-card ${item.isFavorite ? 'favorite' : ''}`;
+        
+        // 要求 1: 如果套用最愛顏色則套用外框與背景，否則維持原色
+        if (item.isFavorite) {
+          card.style.borderColor = item.favoriteColor;
+          card.style.backgroundColor = '#fffbeb';
+        } else {
+          card.style.borderColor = '#e2e8f0';
+          card.style.backgroundColor = '#ffffff';
+        }
+
+        const countdownStr = getCountdownText(item.targetAgingDate);
+
+        card.innerHTML = `
+          ${item.isFavorite ? '<span class="fav-badge">★</span>' : ''}
+          <div class="slot-id">${item.id}</div>
+          <div><span class="slot-status">${item.status}</span></div>
+          <div style="font-size: 11px; color: #64748b;">${countdownStr}</div>
+        `;
+
+        card.onclick = () => openModal(item.id);
+        gridContainer.appendChild(card);
+      });
+    }
+
+    // 要求 5: 計算熟成時間倒數 (45天遞減至最後一日)
+    function getCountdownText(targetTimestamp) {
+      const now = new Date().getTime();
+      const diff = targetTimestamp - now;
+
+      if (diff <= 0) return "已熟成完畢";
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      return `剩餘 ${days} 天 ${hours} 時 ${minutes} 分`;
+    }
+
+    // 開啟回報視窗
+    function openModal(slotId) {
+      selectedSlotId = slotId;
+      const data = storageData.find(d => d.id === slotId);
+      if (!data) return;
+
+      document.getElementById('modalSlotId').value = data.id;
+      document.getElementById('modalStatusSelect').value = data.status;
+      document.getElementById('modalNoteText').value = data.note;
+      
+      updateModalCountdown();
+      document.getElementById('modalOverlay').classList.add('active');
+      updateQuickInfo(data);
+    }
+
+    // 要求 4: 關閉視窗功能
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    // 更新視窗內倒數顯示
+    function updateModalCountdown() {
+      if (!selectedSlotId) return;
+      const data = storageData.find(d => d.id === selectedSlotId);
+      if (data) {
+        document.getElementById('modalAgingCountdown').innerText = getCountdownText(data.targetAgingDate);
+      }
+    }
+
+    // 啟動全域倒數計時器
+    function startCountdownTimer() {
+      setInterval(() => {
+        renderGrid();
+        updateModalCountdown();
+      }, 10000); // 每 10 秒刷新一次倒數顯示
+    }
+
+    // 切換操作員 / 管理員 角色
+    function switchRole() {
+      currentRole = document.getElementById('roleSelect').value;
+      const isAdmin = currentRole === 'admin';
+
+      // 要求 2: 管理員才可編輯備註、狀態與刪除
+      document.getElementById('modalStatusSelect').disabled = !isAdmin;
+      document.getElementById('modalNoteText').disabled = !isAdmin;
+      
+      document.querySelectorAll('.admin-only').forEach(el => {
+        el.style.display = isAdmin ? 'inline-block' : 'none';
+      });
+    }
+
+    // 要求 1: 操作員可在視覺化圖譜點選套用最愛顏色或恢復原色
+    function toggleFavoriteCurrent() {
+      if (!selectedSlotId) return;
+      const data = storageData.find(d => d.id === selectedSlotId);
+      if (data) {
+        data.isFavorite = !data.isFavorite;
+        renderGrid();
+        updateQuickInfo(data);
+      }
+    }
+
+    // 要求 3: 補貨功能不需要打文字 直接把結果顯示在備註欄位
+    function triggerReplenish() {
+      if (!selectedSlotId) return;
+      const data = storageData.find(d => d.id === selectedSlotId);
+      if (data) {
+        const timeStamp = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        // 直接產生固定格式結果至備註
+        data.note = `[自動補貨紀錄] 於 ${timeStamp} 完成系統補貨請求`;
+        data.status = '熟成中';
+        
+        document.getElementById('modalNoteText').value = data.note;
+        document.getElementById('modalStatusSelect').value = data.status;
+        renderGrid();
+        updateQuickInfo(data);
+      }
+    }
+
+    // 要求 2: 管理員保存編輯
+    function saveAdminChanges() {
+      if (currentRole !== 'admin' || !selectedSlotId) return;
+      const data = storageData.find(d => d.id === selectedSlotId);
+      if (data) {
+        data.status = document.getElementById('modalStatusSelect').value;
+        data.note = document.getElementById('modalNoteText').value;
+        renderGrid();
+        updateQuickInfo(data);
+        closeModal();
+      }
+    }
+
+    // 要求 2: 管理員刪除資料
+    function deleteSlotData() {
+      if (currentRole !== 'admin' || !selectedSlotId) return;
+      const data = storageData.find(d => d.id === selectedSlotId);
+      if (data && confirm(`確定要清空/刪除儲位 ${data.id} 的所有狀態資料嗎？`)) {
+        data.status = '空儲位';
+        data.note = '無數據 (已重置)';
+        data.isFavorite = false;
+        renderGrid();
+        closeModal();
+        document.getElementById('quickInfo').innerHTML = '資料已刪除重置';
+      }
+    }
+
+    // 右側詳細資訊區更新
+    function updateQuickInfo(data) {
+      document.getElementById('quickInfo').innerHTML = `
+        <p><strong>儲位:</strong> ${data.id}</p>
+        <p><strong>狀態:</strong> ${data.status}</p>
+        <p><strong>最愛標記:</strong> ${data.isFavorite ? '是' : '否'}</p>
+        <p><strong>倒數時間:</strong> ${getCountdownText(data.targetAgingDate)}</p>
+        <p><strong>備註:</strong> ${data.note}</p>
+      `;
+    }
+
+    // 啟動系統
+    init();
+  </script>
+</body>
+</html>
