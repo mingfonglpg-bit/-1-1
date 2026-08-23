@@ -2,21 +2,21 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智慧倉儲管理系統</title>
-    <!-- 修正為 UMD CDN 網址，確保全域 supabase 物件成功載入 -->
+    <!-- 使用 UMD CDN 確保瀏覽器成功掛載 supabase 物件 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
   <h1>Supabase 身份驗證測試</h1>
 
   <!-- 狀態顯示 -->
-  <div id="auth-status">載入中...</div>
+  <div id="auth-status">初始化中...</div>
   <hr>
 
   <!-- 登入與註冊表單 -->
-  <div id="auth-form" style="display: none;">
+  <div id="auth-form" style="display: block;">
     <h3>註冊 / 登入</h3>
     <input type="email" id="email" placeholder="電子郵件"><br><br>
     <input type="password" id="password" placeholder="密碼"><br><br>
@@ -37,24 +37,27 @@
   </div>
 
   <script>
-    // ⚠️ 請記得填入你自己的 Supabase 憑證
-    const SUPABASE_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co/';
-    // 請至 Supabase > Project Settings > API 複製 anon public key 填入下方
+    // 1. Supabase 設定（請確保填入正確的 anon public key）
+    const SUPABASE_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eHBrYWxydWdscGV1ZnR3bWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczODY3MDQsImV4cCI6MjEwMjk2MjcwNH0.LbV5Arfmebs9sRFTuBM8l2XvaerkJ-wIkNETsG6p2EI';
 
-    // 檢查 Supabase 是否成功載入
-    if (typeof supabase === 'undefined') {
-      alert('Supabase SDK 載入失敗，請檢查網路或 CDN 網址！');
-    } else {
-      const { createClient } = supabase;
-      const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+    let client = null;
 
+    // 2. 初始化 Supabase 客戶端
+    if (typeof supabase === 'undefined') {
+      alert('Supabase SDK 載入失敗，請檢查網路或 CDN！');
+    } else {
+      client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      initAuthListener();
+    }
+
+    // 3. 監聽身份驗證狀態
+    function initAuthListener() {
       const authStatus = document.getElementById('auth-status');
       const authForm = document.getElementById('auth-form');
       const userPanel = document.getElementById('user-panel');
       const userIdSpan = document.getElementById('user-id');
 
-      // 監聽驗證狀態改變
       client.auth.onAuthStateChange((event, session) => {
         if (session) {
           authStatus.innerText = `目前狀態：已登入 (${session.user.email || '第三方登入'})`;
@@ -67,47 +70,48 @@
           userPanel.style.display = 'none';
         }
       });
+    }
 
-      // 實作註冊
-      async function handleSignUp() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const { data, error } = await client.auth.signUp({ email, password });
-        if (error) alert('註冊失敗: ' + error.message);
-        else alert('註冊成功！請檢查信箱或嘗試登入');
-      }
+    // 4. 將按鈕功能宣告在全域，確保 onclick 找得到
+    async function handleSignUp() {
+      if (!client) return alert('Supabase 未初始化');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { data, error } = await client.auth.signUp({ email, password });
+      if (error) alert('註冊失敗: ' + error.message);
+      else alert('註冊請求已發送！請檢查信箱驗證信或嘗試登入');
+    }
 
-      // 實作登入
-      async function handleSignIn() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const { data, error } = await client.auth.signInWithPassword({ email, password });
-        if (error) alert('登入失敗: ' + error.message);
-      }
+    async function handleSignIn() {
+      if (!client) return alert('Supabase 未初始化');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) alert('登入失敗: ' + error.message);
+    }
 
-      // GitHub 登入
-      async function loginWithGitHub() {
-        const { data, error } = await client.auth.signInWithOAuth({
-          provider: 'github',
-          options: { redirectTo: window.location.origin }
-        });
-        if (error) alert('GitHub 登入失敗: ' + error.message);
-      }
+    async function loginWithGitHub() {
+      if (!client) return alert('Supabase 未初始化');
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: window.location.href }
+      });
+      if (error) alert('GitHub 登入失敗: ' + error.message);
+    }
 
-      // Google 登入
-      async function loginWithGoogle() {
-        const { data, error } = await client.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.origin }
-        });
-        if (error) alert('Google 登入失敗: ' + error.message);
-      }
+    async function loginWithGoogle() {
+      if (!client) return alert('Supabase 未初始化');
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href }
+      });
+      if (error) alert('Google 登入失敗: ' + error.message);
+    }
 
-      // 實作登出
-      async function handleSignOut() {
-        const { error } = await client.auth.signOut();
-        if (error) alert('登出失敗: ' + error.message);
-      }
+    async function handleSignOut() {
+      if (!client) return alert('Supabase 未初始化');
+      const { error } = await client.auth.signOut();
+      if (error) alert('登出失敗: ' + error.message);
     }
   </script>
 </body>
