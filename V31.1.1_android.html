@@ -287,7 +287,7 @@
         <!-- 批次操作：勾選表格中的多筆資料後，可一次搬移到新儲位或一次刪除 -->
         <div id="batch-control-panel" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
             <span style="font-size: 13px; color: var(--text-dim); font-weight: bold;">⚙️ 勾選批次操作：</span>
-            <select id="batchMoveZone" class="btn" style="width: 130px; padding: 6px;"><option value="">-- 移至區域 --</option><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option></select>
+            <select id="batchMoveZone" class="btn" style="width: 130px; padding: 6px;"><option value="">-- 移至區域 --</option><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成-左">乾式熟成-左</option><option value="乾式熟成-右">乾式熟成-右</option></select>
             <select id="batchMoveFloor" class="btn" style="width: 100px; padding: 6px;"><option value="">-- 樓層 --</option><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             <input type="number" id="batchMovePos" placeholder="新儲位號" class="btn" style="width: 90px; padding: 6px;">
             <button onclick="executeBatchMove()" class="btn-main" style="background: var(--warning); padding: 8px 15px;">📦 批次轉移</button>
