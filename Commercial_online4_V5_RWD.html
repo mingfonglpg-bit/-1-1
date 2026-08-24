@@ -614,11 +614,92 @@
         document.getElementById('formReg').style.display = type === 'reg' ? 'block' : 'none';
     }
 
-    function handleLogin() {
+    /* ============ 密碼雜湊工具（SHA-256 + 隨機鹽，跨裝置雲端帳號用） ============ */
+    function genSalt() {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    async function hashPassword(password, salt) {
+        const data = new TextEncoder().encode(salt + ':' + password);
+        const digest = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    function getUsersTableName() { return 'warehouse_users'; }
+
+    function formatUsersTableError(err) {
+        const msg = err && err.message ? err.message : String(err);
+        if (msg.includes('Could not find the table') || msg.includes('does not exist') || msg.includes('schema cache')) {
+            const sql = [
+                `create table if not exists ${getUsersTableName()} (`,
+                `  id bigint generated always as identity primary key,`,
+                `  username text unique not null,`,
+                `  salt text not null,`,
+                `  pass_hash text not null,`,
+                `  role text not null default 'operator',`,
+                `  created_at timestamptz default now()`,
+                `);`,
+                `alter table ${getUsersTableName()} enable row level security;`,
+                `create policy "allow all" on ${getUsersTableName()} for all using (true) with check (true);`
+            ].join('\n');
+            return `⚠️ 雲端帳號資料表尚未建立：${msg}\n\n請至 Supabase 專案 SQL Editor 執行以下指令後再試一次：\n\n${sql}`;
+        }
+        return `⚠️ 雲端帳號作業失敗：${msg}`;
+    }
+
+    async function handleLogin() {
         const u = document.getElementById('loginUser').value.trim();
         const p = document.getElementById('loginPass').value.trim();
         if (!u || !p) { alert('請輸入帳號與密碼'); return; }
 
+        /* 雲端帳號模式：已連接 Supabase 且非離線 → 帳號可跨裝置共用 */
+        if (supabaseClient && !isOfflineMode) {
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const { data, error } = await supabaseClient
+                    .from(getUsersTableName())
+                    .select('*')
+                    .eq('username', u)
+                    .maybeSingle();
+                document.getElementById('loader').style.display = 'none';
+
+                if (error) { alert(formatUsersTableError(error)); return; }
+
+                if (!data) {
+                    /* 尚未有任何雲端帳號時，允許用預設管理者帳密首次建立雲端管理員 */
+                    const { count } = await supabaseClient.from(getUsersTableName()).select('*', { count: 'exact', head: true });
+                    if ((!count || count === 0) && u === 'admin' && p === 'admin123') {
+                        const salt = genSalt();
+                        const passHash = await hashPassword(p, salt);
+                        const { error: insErr } = await supabaseClient.from(getUsersTableName()).insert([{ username: 'admin', salt, pass_hash: passHash, role: 'admin' }]);
+                        if (insErr) { alert(formatUsersTableError(insErr)); return; }
+                        currentUser = { username: 'admin', role: 'admin' };
+                        sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                        document.getElementById('authModal').style.display = 'none';
+                        initApp();
+                        return;
+                    }
+                    alert('帳號或密碼錯誤！');
+                    return;
+                }
+
+                const passHash = await hashPassword(p, data.salt);
+                if (passHash === data.pass_hash) {
+                    currentUser = { username: data.username, role: data.role };
+                    sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                    document.getElementById('authModal').style.display = 'none';
+                    initApp();
+                } else {
+                    alert('帳號或密碼錯誤！');
+                }
+            } catch (err) {
+                document.getElementById('loader').style.display = 'none';
+                alert('登入時發生錯誤：' + err.message);
+            }
+            return;
+        }
+
+        /* 離線模式：帳號僅存於本機瀏覽器，不會跨裝置同步 */
         let users = JSON.parse(localStorage.getItem('warehouse_users_db') || '[]');
         if (users.length === 0 && u === 'admin' && p === 'admin123') {
             users.push({ username: 'admin', pass: 'admin123', role: 'admin' });
@@ -632,22 +713,50 @@
             document.getElementById('authModal').style.display = 'none';
             initApp();
         } else {
-            alert('帳號或密碼錯誤！(預設管理者: admin / admin123)');
+            alert('帳號或密碼錯誤！(預設管理者: admin / admin123，離線模式帳號僅存於本機)');
         }
     }
 
-    function handleRegister() {
+    async function handleRegister() {
         const u = document.getElementById('regUser').value.trim();
         const p = document.getElementById('regPass').value.trim();
         const r = document.getElementById('regRole').value;
         if (!u || !p) { alert('請填寫完整註冊資訊'); return; }
 
+        /* 雲端帳號模式：寫入 Supabase，所有裝置都能用同一組帳密登入 */
+        if (supabaseClient && !isOfflineMode) {
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const { data: existing, error: checkErr } = await supabaseClient
+                    .from(getUsersTableName())
+                    .select('username')
+                    .eq('username', u)
+                    .maybeSingle();
+                if (checkErr) { document.getElementById('loader').style.display = 'none'; alert(formatUsersTableError(checkErr)); return; }
+                if (existing) { document.getElementById('loader').style.display = 'none'; alert('該帳號已被註冊'); return; }
+
+                const salt = genSalt();
+                const passHash = await hashPassword(p, salt);
+                const { error } = await supabaseClient.from(getUsersTableName()).insert([{ username: u, salt, pass_hash: passHash, role: r }]);
+                document.getElementById('loader').style.display = 'none';
+                if (error) { alert(formatUsersTableError(error)); return; }
+
+                alert('雲端帳號註冊成功！所有裝置皆可用此帳密登入。');
+                switchAuthTab('login');
+            } catch (err) {
+                document.getElementById('loader').style.display = 'none';
+                alert('註冊時發生錯誤：' + err.message);
+            }
+            return;
+        }
+
+        /* 離線模式：僅存於本機，不會跨裝置同步 */
         let users = JSON.parse(localStorage.getItem('warehouse_users_db') || '[]');
         if (users.some(x => x.username === u)) { alert('該帳號已被註冊'); return; }
 
         users.push({ username: u, pass: p, role: r });
         localStorage.setItem('warehouse_users_db', JSON.stringify(users));
-        alert('註冊成功！請直接登入');
+        alert('註冊成功！（目前為離線模式，此帳號僅存於本機瀏覽器，換裝置需重新註冊）');
         switchAuthTab('login');
     }
 
