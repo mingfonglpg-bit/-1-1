@@ -632,12 +632,24 @@
 
     // 初始化 Supabase 連線
     function initSupabase() {
-        if (BACKEND_CONFIG && BACKEND_CONFIG.mode === 'supabase' && BACKEND_CONFIG.supabaseUrl && BACKEND_CONFIG.supabaseKey) {
-            const { createClient } = supabase;
-            supabaseClient = createClient(BACKEND_CONFIG.supabaseUrl, BACKEND_CONFIG.supabaseKey);
-            authClient = supabaseClient;
-            console.log("✅ 客戶 Supabase（資料 + Auth）已初始化");
+        if (!BACKEND_CONFIG || BACKEND_CONFIG.mode !== 'supabase') {
+            supabaseClient = null;
+            authClient = null;
+            return false;
         }
+        if (!BACKEND_CONFIG.supabaseUrl || !BACKEND_CONFIG.supabaseKey) {
+            supabaseClient = null;
+            authClient = null;
+            return false;
+        }
+        if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+            throw new Error('Supabase JavaScript 函式庫尚未載入，請檢查網路連線或 CDN。');
+        }
+        const { createClient } = window.supabase;
+        supabaseClient = createClient(BACKEND_CONFIG.supabaseUrl, BACKEND_CONFIG.supabaseKey);
+        authClient = supabaseClient;
+        console.log("✅ 客戶 Supabase（資料 + Auth）已初始化");
+        return true;
     }
 
     window.onload = async function() {
@@ -648,7 +660,10 @@
             return;
         }
         applyBrandSettings();
-        initSupabase();
+        try { initSupabase(); } catch (e) {
+            console.error('Supabase 初始化失敗：', e);
+            showToast('⚠️ Supabase 函式庫載入失敗，請重新整理頁面');
+        }
         try { initAuthClient(); } catch (e) { console.warn(e.message); }
 
         if (currentUser) {
@@ -1003,35 +1018,62 @@
     }
 
     async function completeOnboarding() {
-        const brand = document.getElementById('wizBrand').value.trim() || "智慧倉儲系統";
-        const zName = document.getElementById('wizZoneName').value.trim() || "區域 A";
-        const floors = parseInt(document.getElementById('wizFloors').value) || 4;
-        const perFloor = parseInt(document.getElementById('wizPerFloor').value) || 20;
-        const mode = 'supabase';
-        const supaUrl = document.getElementById('wizSupaUrl').value.trim();
-        const supaKey = document.getElementById('wizSupaKey').value.trim();
-        if (!/^https:\/\/[^\s]+\.supabase\.co/i.test(supaUrl)) { alert('請輸入正確的客戶 Supabase Project URL，例如 https://xxxx.supabase.co'); return; }
-        if (!supaKey) { alert('請輸入客戶 Supabase Publishable / Anon Key'); return; }
+        const btn = document.querySelector('#wizardStep3 button[onclick*=\"completeOnboarding\"]');
+        if (btn) btn.disabled = true;
+        try {
+            const brand = document.getElementById('wizBrand').value.trim() || "智慧倉儲系統";
+            const zName = document.getElementById('wizZoneName').value.trim() || "區域 A";
+            const floors = parseInt(document.getElementById('wizFloors').value, 10) || 4;
+            const perFloor = parseInt(document.getElementById('wizPerFloor').value, 10) || 20;
+            const mode = 'supabase';
+            const supaUrl = document.getElementById('wizSupaUrl').value.trim().replace(/\/$/, '');
+            const supaKey = document.getElementById('wizSupaKey').value.trim();
 
-        WAREHOUSE_SETUP = { brand, version: 'V53 Customer Supabase' };
-        ZONE_SETUP = [{ name: zName, floors, perFloor }];
-        BACKEND_CONFIG = {
-            mode,
-            scriptUrl: document.getElementById('wizScriptUrl').value.trim(),
-            supabaseUrl: supaUrl,
-            supabaseKey: supaKey
-        };
+            if (!/^https:\/\/[^\s]+\.supabase\.co$/i.test(supaUrl)) {
+                alert('請輸入正確的客戶 Supabase Project URL，例如 https://xxxx.supabase.co');
+                return;
+            }
+            if (!supaKey) {
+                alert('請輸入客戶 Supabase Publishable / Anon Key');
+                return;
+            }
+            if (!Number.isInteger(floors) || floors < 1 || floors > 100) {
+                alert('樓層數必須介於 1～100');
+                return;
+            }
+            if (!Number.isInteger(perFloor) || perFloor < 1 || perFloor > 10000) {
+                alert('每層庫位數必須介於 1～10000');
+                return;
+            }
 
-        localStorage.setItem('warehouse_setup_config', JSON.stringify(WAREHOUSE_SETUP));
-        localStorage.setItem('warehouse_zone_setup', JSON.stringify(ZONE_SETUP));
-        localStorage.setItem('warehouse_backend_config', JSON.stringify(BACKEND_CONFIG));
+            WAREHOUSE_SETUP = { brand, version: 'V53 Customer Supabase' };
+            ZONE_SETUP = [{ name: zName, floors, perFloor }];
+            BACKEND_CONFIG = {
+                mode,
+                supabaseUrl: supaUrl,
+                supabaseKey: supaKey
+            };
 
-        initSupabase();
-        try { initAuthClient(); } catch (e) { alert('Supabase 初始化失敗：' + e.message); return; }
-        closeModal('wizardModal');
-        applyBrandSettings();
-        document.getElementById('authModal').style.display = 'flex';
-        await refreshAdminRegistrationLock();
+            // 重新設定時不能沿用舊的 Supabase client。
+            supabaseClient = null;
+            authClient = null;
+            localStorage.setItem('warehouse_setup_config', JSON.stringify(WAREHOUSE_SETUP));
+            localStorage.setItem('warehouse_zone_setup', JSON.stringify(ZONE_SETUP));
+            localStorage.setItem('warehouse_backend_config', JSON.stringify(BACKEND_CONFIG));
+
+            if (!initSupabase()) throw new Error('Supabase 初始化失敗：URL / Key 無效或函式庫尚未載入');
+            initAuthClient();
+
+            closeModal('wizardModal');
+            applyBrandSettings();
+            document.getElementById('authModal').style.display = 'flex';
+            await refreshAdminRegistrationLock();
+        } catch (e) {
+            console.error('完成建檔設定失敗：', e);
+            alert('完成設定失敗：' + (e && e.message ? e.message : String(e)));
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     }
 
     function initApp() {
