@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業級智慧倉儲庫位控管系統 - 商業專業版</title>
+    <!-- 匯出 XLSX 函式庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- QRCode 產生函式庫（純前端產生 QRCode 圖片，不會將設定資料傳送至任何第三方伺服器） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root { 
+            --primary: #06b6d4; --primary-hover: #0891b2; --warning: #f59e0b; --danger: #ef4444; --edit: #10b981;
+            --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.75);
+            --text-main: #f8fafc; --text-dim: #94a3b8; --border: rgba(255, 255, 255, 0.12);
+            --select-bg: #1e293b; --select-text: #c7d2fe;
+            --color-polar-l: #38bdf8; --color-polar-r: #818cf8;
+            --color-cool-l:  #fbbf24; --color-cool-r:  #fb7185;
+            --color-normal:  #34d399; --color-cut:     #a855f7;
+            --color-restock: #ec4899;
+            --filter-range-15: #ef4444; --filter-range-30: #f97316; --filter-range-60: #eab308;
+        }
+        * { box-sizing: border-box; transition: all 0.2s; }
+        body { font-family: 'Inter', "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; min-height: 100vh; }
+        
+        .container { width: 95%; max-width: 1400px; margin: 20px auto; background: var(--card-bg); backdrop-filter: blur(20px); padding: 25px; border-radius: 28px; border: 1px solid var(--border); display: none; }
+        
+        /* 登入 / 註冊頁面 (REG模組整合) */
+        .auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .auth-card { background: var(--select-bg); border: 1px solid var(--primary); border-radius: 24px; padding: 35px; width: 100%; max-width: 440px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 25px; }
+        .auth-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: var(--text-dim); font-weight: bold; }
+        .auth-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .auth-form-group { margin-bottom: 18px; text-align: left; }
+        .auth-form-group label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+        .auth-input { width: 100%; padding: 12px 16px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; color: white; outline: none; font-size: 14px; }
+        .auth-input:focus { border-color: var(--primary); }
+
+        /* UI 元件樣式 */
+        .marquee-container { background: rgba(6, 182, 212, 0.1); border-radius: 12px; padding: 8px 15px; margin-bottom: 15px; overflow: hidden; white-space: nowrap; border: 1px solid rgba(6, 182, 212, 0.2); position: relative; padding-right: 120px; min-height: 40px; display:flex; align-items:center; }
+        .marquee-text { display: inline-block; animation: marquee 20s linear infinite; color: var(--primary); font-weight: 500; }
+        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        
+        .empty-count-badge { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 13px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; }
+        select.btn, input.btn { background: var(--select-bg) !important; color: var(--select-text) !important; border: 1px solid var(--border); padding: 12px; border-radius: 12px; outline: none; width: 100%; font-size: 14px; }
+        
+        .slot { aspect-ratio: 1; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; gap: 2px; font-weight: bold; color: var(--text-main); position: relative; }
+        .slot span.count { font-size: 9px; opacity: 0.8; font-weight: normal; }
+        .slot.occupied { color: white; }
+        .slot.active-slot { border: 2px solid #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.8); }
+        
+        .btn-filter { background: #1e293b; color: var(--text-dim); border: 1px solid var(--border); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-filter.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3); }
+
+        .admin-edit-btn { background: var(--edit) !important; color: #fff !important; }
+        .marquee-edit-btn { position:absolute; right:10px; top:50%; transform:translateY(-50%); z-index:2; }
+        .visual-edit-btn { margin-top:2px; padding:1px 4px !important; font-size:9px !important; }
+        .table-switch-badge { font-size:11px; color:var(--text-dim); margin-left:8px; }
+        .inventory-table-wrap { width:100%; overflow-x:auto; }
+        #mobileSortBar { display: none; }
+        table { min-width: 1050px; width: 100%; border-collapse: separate; border-spacing: 0 10px; margin-top: 15px; }
+        th { color: var(--text-dim); padding: 15px 15px; text-align: left; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+        td { padding: 15px 15px; background: rgba(255, 255, 255, 0.03); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); vertical-align: middle; }
+        td:first-child { border-left: 1px solid var(--border); border-radius: 15px 0 0 15px; }
+        td:last-child { border-right: 1px solid var(--border); border-radius: 0 15px 15px 0; }
+        
+        .btn-main { padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: var(--primary); color: white; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; justify-content: center; }
+        .btn-main:hover { background: var(--primary-hover); transform: translateY(-2px); }
+        
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:11000; justify-content:center; align-items:center; backdrop-filter: blur(5px); }
+        .modal-content { position: relative; background:var(--select-bg); padding:30px; border-radius:28px; width:90%; max-width:520px; border:1px solid var(--primary); max-height: 90vh; overflow-y: auto; }
+        .modal-close-btn { position: absolute; right: 20px; top: 20px; background: transparent; border: none; color: var(--text-dim); font-size: 22px; cursor: pointer; font-weight: bold; line-height: 1; z-index: 10; }
+        .modal-close-btn:hover { color: white; }
+
+        #loader { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:12000; justify-content:center; align-items:center; color:white; font-weight: bold; }
+        
+        .sync-toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(120px); background:linear-gradient(135deg,#10b981,#06b6d4); color:#fff; padding:15px 30px; border-radius:50px; box-shadow:0 10px 30px rgba(0,0,0,.4); z-index:13000; opacity:0; transition:all .5s cubic-bezier(.16,1,.3,1); font-weight:bold; }
+        .sync-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+        .status-tag { display:inline-block; font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(6,182,212,0.2); color:#38bdf8; margin-top:4px; }
+        .slot-color-toolbar { display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--primary); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        @media screen and (max-width: 900px) {
+            .container { width: 100%; padding: 16px; border-radius: 18px; margin: 8px auto; }
+        }
+
+        /* ============ 平板 / 手機 RWD (<=768px) ============ */
+        @media screen and (max-width: 768px) {
+            body { font-size: 14px; }
+            .container { padding: 14px; border-radius: 16px; }
+
+            /* 登入頁 */
+            .auth-card { padding: 24px 20px; border-radius: 18px; }
+
+            /* 頁首：改為垂直堆疊，按鈕全寬方便點擊 */
+            header { flex-direction: column; align-items: stretch !important; gap: 10px !important; }
+            header h2 { text-align: center; font-size: 1.2rem; }
+            header > div { justify-content: center; width: 100%; }
+            header > div select, header > div button, header > div span#userBadge { flex: 1 1 auto; }
+            #tableSelect { width: 100% !important; }
+
+            /* 公告字卡 */
+            .marquee-container { padding-right: 100px; }
+            .marquee-edit-btn { font-size: 11px; padding: 6px 8px !important; }
+
+            /* 新增入庫面板 / 編輯彈窗內的多欄表單，改為單欄 */
+            #admin-panel > div,
+            #itemEditModal .modal-content > div,
+            #editCustomFieldsContainer,
+            #wizardStep2 > div,
+            #zoneManageModal .modal-content > div[style*="grid-template-columns: 2fr"] {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* 視覺化地圖區塊標題與工具列 */
+            section > div[style*="justify-content:space-between"] { justify-content: center !important; text-align: center; }
+            #vZone, #vFloor { width: auto !important; flex: 1 1 100px; }
+
+            /* 庫位地圖格數配合小螢幕縮減 */
+            #visualGrid { grid-template-columns: repeat(5, 1fr) !important; gap: 6px !important; }
+            .slot { font-size: 10px; }
+
+            /* 快速搜尋列：搜尋框與匯出按鈕各自獨立成行 */
+            #searchInput { flex: 1 1 100% !important; min-width: 100% !important; }
+            .btn-filter { flex: 1 1 auto; text-align: center; font-size: 12px; padding: 8px 10px; }
+
+            /* 手機/平板專用排序工具：桌機表頭在此斷點被隱藏（卡片化呈現），改用這個工具列排序 */
+            #mobileSortBar { display: flex; }
+            #mobileSortKey { flex: 1 1 60%; }
+            #mobileSortDirBtn { flex: 1 1 auto; }
+
+            /* 彈窗 */
+            .modal-content { width: 92%; padding: 22px 18px; border-radius: 20px; }
+
+            /* 庫存列表：卡片化，所有欄位皆可見（改良自舊版隱藏式設計） */
+            .inventory-table-wrap { overflow-x: visible; }
+            table { min-width: 0; width: 100%; border-spacing: 0 12px; }
+            thead { display: none; }
+            table, tbody, tr, td { display: block; width: 100%; }
+            tr {
+                margin-bottom: 0;
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                background: rgba(30, 41, 59, 0.8) !important;
+                padding: 6px 0;
+            }
+            td {
+                display: flex !important;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                text-align: right;
+                padding: 10px 16px;
+                border: none !important;
+                border-radius: 0 !important;
+            }
+            td:first-child, td:last-child { border: none !important; border-radius: 0 !important; }
+            td:not(:last-child) { border-bottom: 1px dashed var(--border) !important; }
+            td::before {
+                content: attr(data-label);
+                float: none;
+                flex-shrink: 0;
+                text-align: left;
+                color: var(--text-dim);
+                font-size: 12px;
+                padding-top: 2px;
+            }
+            /* 讓「備註與狀態」「回報/補貨」「操作」欄位中的多個按鈕視為單一區塊，
+               彼此緊鄰排列，而不是被 td 的 justify-content:space-between 各自推到左右兩端 */
+            td .cell-value-group {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 6px;
+            }
+
+            /* 分頁控制列置中並可換行 */
+            #paginationControls { justify-content: center; text-align: center; }
+            #paginationControls > div { justify-content: center; width: 100%; }
+        }
+
+        /* ============ 小型手機 (<=480px) 進一步微調 ============ */
+        @media screen and (max-width: 480px) {
+            .container { padding: 10px; }
+            header h2 { font-size: 1.05rem; }
+            .btn-main { font-size: 12px; padding: 9px 12px; }
+            #visualGrid { grid-template-columns: repeat(4, 1fr) !important; gap: 5px !important; }
+            .slot { font-size: 9px; }
+            .marquee-container { padding-right: 90px; font-size: 12px; }
+            .modal-content { width: 94%; padding: 18px 14px; }
+            .btn-filter { font-size: 11px; padding: 7px 8px; }
+            td { font-size: 13px; }
+        }
+
+        /* 觸控裝置：加大可點擊區域，避免誤觸 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-main, .btn-filter, select.btn, input.btn { min-height: 42px; }
+            th[onclick] { padding: 15px 12px; }
+        }
+</style>
+</head>
+<body>
+
+<div id="loader">⚙️ 資料同步處理中...</div>
+<div id="syncToast" class="sync-toast"></div>
+
+<!-- REG 註冊/登入 整合模組視窗 -->
+<div id="authModal" class="auth-overlay">
+    <div class="auth-card">
+        <h2 style="text-align:center; margin-top:0; color:var(--primary); font-size: 1.5rem;" id="sysTitleDisplay">📦 智慧倉儲管理系統</h2>
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">使用者登入</div>
+            <div class="auth-tab" id="tabReg" onclick="switchAuthTab('reg')">新帳號註冊</div>
+        </div>
+        
+        <!-- 登入表單 -->
+        <div id="formLogin">
+            <div class="auth-form-group">
+                <label>電子郵件</label>
+                <input type="email" id="loginUser" class="auth-input" placeholder="請輸入電子郵件">
+            </div>
+            <div class="auth-form-group">
+                <label>密碼</label>
+                <input type="password" id="loginPass" class="auth-input" placeholder="請輸入密碼">
+            </div>
+            <button class="btn-main" style="width:100%; margin-top:15px; padding:12px;" onclick="handleLogin()">🚀 登入系統</button>
+            <button class="btn-main" style="width:100%; margin-top:10px; padding:12px; background:#475569;" onclick="handleGuestAccess()">👀 快速訪問（僅檢視，無需登入）</button>
+            <div style="margin-top:15px; text-align:center;">
+                <a href="#" style="color:var(--text-dim); font-size:12px; text-decoration:none;" onclick="startOnboardingWizard()">⚙️ 初次使用？啟動建檔精靈</a>
+            </div>
+        </div>
+
+        <!-- 註冊表單 -->
+        <div id="formReg" style="display:none;">
+            <div class="auth-form-group">
+                <label>電子郵件</label>
+                <input type="email" id="regUser" class="auth-input" placeholder="請輸入電子郵件">
+            </div>
+            <div class="auth-form-group">
+                <label>設定密碼</label>
+                <input type="password" id="regPass" class="auth-input" placeholder="至少 6 位字元">
+            </div>
+            <div class="auth-form-group">
+                <label>權限類別</label>
+                <select id="regRole" class="auth-input" style="background:var(--select-bg)">
+                    <option value="operator">現場操作員 (可查詢、回報)</option>
+                    <option value="admin">系統管理員 (全權限)</option>
+                </select>
+            </div>
+            <button class="btn-main" style="width:100%; margin-top:15px; padding:12px; background:var(--edit);" onclick="handleRegister()">📝 送出註冊</button>
+        </div>
+    </div>
+</div>
+
+<!-- 建檔精靈 -->
+<div id="wizardModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close-btn" onclick="closeModal('wizardModal')">✖</button>
+        <h3 style="color:var(--primary); margin-top:0;">✨ 歡迎使用！從 0 開始建立您的倉儲</h3>
+        <p style="font-size:13px; color:var(--text-dim);">只需 3 個步驟，即可完成您的專屬倉儲控管系統建檔：</p>
+        
+        <div id="wizardStep1">
+            <h4>第 1 步：設定企業與倉庫名稱</h4>
+            <input type="text" id="wizBrand" class="btn" placeholder="例如：極速物流 倉儲系統" value="我的智慧倉儲中心">
+            <button class="btn-main" style="width:100%; margin-top:15px;" onclick="nextWizStep(2)">下一步 ➔</button>
+        </div>
+
+        <div id="wizardStep2" style="display:none;">
+            <h4>第 2 步：設定第一個倉庫區域格局</h4>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px;">
+                <input type="text" id="wizZoneName" class="btn" placeholder="區域名稱" value="常溫 A 區">
+                <input type="number" id="wizFloors" class="btn" placeholder="樓層" value="4">
+                <input type="number" id="wizPerFloor" class="btn" placeholder="每層庫位" value="20">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-main" style="background:#475569; flex:1;" onclick="nextWizStep(1)">上一頁</button>
+                <button class="btn-main" style="flex:1;" onclick="nextWizStep(3)">下一步 ➔</button>
+            </div>
+        </div>
+
+        <div id="wizardStep3" style="display:none;">
+            <h4>第 3 步：選擇資料備份後端</h4>
+            <select id="wizBackendMode" class="btn" onchange="toggleWizBackendFields()">
+                <option value="google_gs">Google Apps Script (一般版)</option>
+                <option value="supabase">Supabase (企業級高效能)</option>
+            </select>
+            <div id="wizGsGroup" style="margin-top:10px;">
+                <input type="text" id="wizScriptUrl" class="btn" placeholder="貼上 Google Web App URL (可暫留空以本機體驗)">
+            </div>
+            <div id="wizSupaGroup" style="margin-top:10px; display:none;">
+                <input type="text" id="wizSupaUrl" class="btn" placeholder="Supabase URL" style="margin-bottom:8px;">
+                <input type="text" id="wizSupaKey" class="btn" placeholder="Supabase Publishable/Anon Key">
+            </div>
+            <button class="btn-main" style="width:100%; margin-top:20px; background:var(--edit);" onclick="completeOnboarding()">🎉 完成設定並啟動系統</button>
+        </div>
+    </div>
+</div>
+
+<!-- 分享設定給其他裝置 -->
+<div id="shareLinkModal" class="modal">
+    <div class="modal-content" style="max-width:440px; text-align:center;">
+        <button class="modal-close-btn" onclick="closeModal('shareLinkModal')">✖</button>
+        <h3 style="color:var(--primary); margin-top:0;">🔗 分享系統設定給其他裝置</h3>
+        <p style="font-size:13px; color:var(--text-dim); text-align:left;">
+            其他裝置掃描 QRCODE 或開啟連結後，會自動套用本系統目前的品牌、倉庫格局與資料服務（雲端）設定，直接進入<b>登入畫面</b>，不需重新輸入設定。帳號登入／註冊使用共用雲端帳號（Supabase Auth），任一裝置皆可用同一組電子郵件與密碼登入。
+        </p>
+        <div id="qrcodeContainer" style="display:flex; justify-content:center; margin:18px 0; background:#fff; padding:12px; border-radius:16px; width:fit-content; margin-left:auto; margin-right:auto;"></div>
+        <div class="auth-form-group" style="text-align:left;">
+            <label>分享連結</label>
+            <input type="text" id="shareLinkInput" class="auth-input" readonly onclick="this.select()">
+        </div>
+        <button class="btn-main" style="width:100%; margin-top:10px; padding:12px;" onclick="copyShareLink()">📋 複製連結</button>
+        <p style="font-size:11px; color:var(--text-dim); margin-top:14px; text-align:left;">
+            ⚠️ 此連結包含資料服務連線金鑰，請僅分享給信任的內部裝置或人員，切勿公開發布。
+        </p>
+    </div>
+</div>
+
+<!-- 主控制台畫面 -->
+<div class="container" id="main-container">
+    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin:0;" id="appBrandTitle">📦 庫位狀態</h2>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <span id="userBadge" style="font-size:12px; background:rgba(255,255,255,0.1); padding:6px 12px; border-radius:20px;">👤 檢視者</span>
+            <span style="font-size:14px; font-weight:bold; color:var(--text-main);">資料庫：</span>
+            <select id="tableSelect" onchange="handleTableSelectChange()" class="btn" style="width:150px;" title="選擇資料表"></select>
+            <button id="netStatusBtn" onclick="toggleNetworkMode()" class="btn-main" style="background:#10b981;">🌐 線上模式</button>
+            <button onclick="fetchData()" class="btn-main" style="background:#334155;">🔄 刷新</button>
+            <button id="backendSettingsBtn" onclick="openBackendSettings()" class="btn-main" style="background:#4338ca;">☁️ 資料服務</button>
+            <button id="shareLinkBtn" onclick="openShareModal()" class="btn-main" style="display:none; background:#0e7490;">🔗 分享設定給其他裝置</button>
+            <button onclick="handleLogout()" class="btn-main" style="background:var(--danger);">🚪 登出</button>
+        </div>
+    </header>
+
+    <div class="marquee-container">
+        <div class="marquee-text" id="marqueeDisplay">🔔 歡迎使用智慧倉儲系統，請點擊新增入庫進行初次建檔。</div>
+        <button id="marqueeEditBtn" class="btn-main marquee-edit-btn admin-edit-btn" style="display:none;" onclick="openMarqueeEditModal()">✏️ 編輯字卡</button>
+    </div>
+
+    <!-- 管理員新增入庫面板 -->
+    <div id="admin-panel" style="display:none; background:rgba(6,182,212,0.05); padding:20px; border-radius:24px; border:1px solid var(--primary); margin-bottom:25px;">
+        <h4 style="margin-top:0; color:var(--primary); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span>➕ 產品新增入庫建檔</span>
+            <button class="btn-main" style="background:#0e7490; font-size:12px; padding:6px 10px;" onclick="openCustomFieldModal()">⚙️ 自訂欄位管理</button>
+        </h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
+            <select id="addZone" class="btn"></select>
+            <select id="addFloor" class="btn"></select>
+            <input type="number" id="addPos" placeholder="儲位號" class="btn">
+            <input type="text" id="addName" placeholder="產品名稱" class="btn">
+            <input type="text" id="addBatch" placeholder="批號" class="btn">
+            <input type="date" id="addDate" class="btn" title="有效日期">
+            <input type="number" id="addAging" placeholder="熟成天數 (如: 45)" class="btn" title="填寫熟成天數並獨立計算熟成倒數" oninput="handleAddAgingInput()">
+            <input type="text" id="addNote" placeholder="備註" class="btn">
+            <div id="addCustomFieldsContainer" style="display:contents;"></div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <input type="color" id="addColor" class="btn" style="padding:2px; height:40px; cursor:pointer;" value="#06b6d4">
+                <div id="addColorPalette" style="display:flex; gap:6px; align-items:center;"></div>
+            </div>
+            <button onclick="submitFormAction('add')" class="btn-main">➕ 入庫建檔</button>
+        </div>
+    </div>
+
+    <!-- 視覺化地圖 -->
+    <section style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 24px; border: 1px solid var(--border); margin-bottom:25px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <b id="mapTitle" style="color:var(--primary); font-size:16px;">儲位視覺化圖譜</b><span id="currentTableBadge" class="table-switch-badge"></span>
+                <span id="floorEmptyCount" class="empty-count-badge" style="margin-left:10px;">🔲 空庫位: --</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button id="favColorBtn" onclick="openFavColorModal()" class="btn-main" style="background:#7c3aed; font-size:12px;">🎨 我的最愛顏色</button>
+                <button id="zoneManageBtn" onclick="openZoneManageModal()" class="btn-main" style="display:none; background:#0e7490; font-size:12px;">🏭 區域庫位格局設定</button>
+                <select id="vZone" onchange="renderVisual()" class="btn" style="width:130px;"></select>
+                <select id="vFloor" onchange="renderVisual()" class="btn" style="width:80px;"></select>
+            </div>
+        </div>
+        
+        <div id="slotColorToolbar" class="slot-color-toolbar" style="display:none;">
+            <span id="slotColorToolbarLabel" style="font-size:12px; font-weight:bold; color:#38bdf8;">📍 點選庫位:</span>
+            <span style="font-size:12px; color:var(--text-dim);">點擊色彩套用:</span>
+            <div id="slotFavPalette" style="display:flex; gap:6px; align-items:center;"></div>
+            <button class="btn-main" style="padding:2px 8px; font-size:11px; background:#475569;" onclick="applySlotColor(null)">🔄 恢復原本顏色</button>
+        </div>
+
+        <div id="visualGrid" style="display:grid; gap:8px;"></div>
+
+        <div style="margin-top:20px; padding-top:15px; border-top:1px dashed var(--border);">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:bold; color:var(--text-dim);">⚡ 快速全庫搜索：</span>
+                <button class="btn-filter" id="filter15" onclick="setExpFilter(1, 15)">🚨 即期 (1-15日)</button>
+                <button class="btn-filter" id="filter30" onclick="setExpFilter(16, 30)">⚠️ 30日 (16-30日)</button>
+                <button class="btn-filter" id="filter60" onclick="setExpFilter(31, 60)">📢 60日 (31-60日)</button>
+                <button class="btn-filter" id="filterAll" onclick="clearAllFilters()" style="background:#334155; color:white;">🔄 重置 / 全庫</button>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="searchInput" class="btn" style="flex:1; min-width:220px;" placeholder="🔍 請輸入關鍵字搜尋 (產品名稱、批號、庫位...)" oninput="handleSearchInput()">
+                <button onclick="exportToExcel()" class="btn-main" style="background:#10b981; white-space:nowrap;">📥 一鍵匯出當前搜尋結果 (.XLSX)</button>
+            </div>
+
+            <!-- 手機/平板專用排序工具：桌機版用表頭點擊排序，但手機版表頭是隱藏的（卡片化呈現），
+                 所以另外提供一組下拉選單＋方向切換鈕，功能與桌機的表頭點擊排序完全同步 -->
+            <div id="mobileSortBar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+                <span style="font-size:13px; font-weight:bold; color:var(--text-dim); white-space:nowrap;">🔀 排序：</span>
+                <select id="mobileSortKey" class="btn" style="flex:1; min-width:140px;" onchange="applyMobileSort()">
+                    <option value="">預設（不排序）</option>
+                    <option value="zone">儲位</option>
+                    <option value="name">產品名稱</option>
+                    <option value="date">有效日期</option>
+                    <option value="aging">熟成時間</option>
+                    <option value="batch">批號</option>
+                </select>
+                <button id="mobileSortDirBtn" class="btn-main" style="background:#475569; white-space:nowrap;" onclick="toggleMobileSortDir()">⬆️ 由小到大</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 庫存列表表格 -->
+    <div class="inventory-table-wrap">
+        <table>
+            <thead>
+                <tr id="tableHeadRow">
+                    <th onclick="sortTable('zone')" style="cursor:pointer; user-select:none;">儲位 <span id="sortIcon-zone"></span></th>
+                    <th onclick="sortTable('name')" style="cursor:pointer; user-select:none;">產品名稱 <span id="sortIcon-name"></span></th>
+                    <th onclick="sortTable('date')" style="cursor:pointer; user-select:none;">有效日期 <span id="sortIcon-date"></span></th>
+                    <th onclick="sortTable('aging')" style="cursor:pointer; user-select:none;">熟成時間<span id="sortIcon-aging"></span></th>
+                    <th onclick="sortTable('batch')" style="cursor:pointer; user-select:none;">批號 <span id="sortIcon-batch"></span></th>
+                    <th id="noteHeader">備註與狀態</th>
+                    <th>回報 / 補貨</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 分頁控制 UI -->
+    <div id="paginationControls" style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; flex-wrap:wrap; gap:10px;">
+        <div style="font-size:13px; color:var(--text-dim);" id="pageInfo">顯示第 0 - 0 筆，共 0 筆</div>
+        <div style="display:flex; gap:6px;">
+            <button class="btn-main" style="padding:6px 12px; font-size:12px; background:#334155;" onclick="goToPage(1)">首頁</button>
+            <button class="btn-main" style="padding:6px 12px; font-size:12px; background:#334155;" onclick="changePage(-1)">上一頁</button>
+            <span id="pageNumberDisplay" style="align-self:center; font-weight:bold; font-size:13px; margin:0 8px;">1 / 1</span>
+            <button class="btn-main" style="padding:6px 12px; font-size:12px; background:#334155;" onclick="changePage(1)">下一頁</button>
+            <button class="btn-main" style="padding:6px 12px; font-size:12px; background:#334155;" onclick="goToPage('last')">末頁</button>
+        </div>
+    </div>
+</div>
+
+<!-- 我的最愛顏色彈窗 -->
+<div id="favColorModal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <button class="modal-close-btn" onclick="closeModal('favColorModal')">✖</button>
+        <h3 style="margin-top:0;">🎨 我的最愛顏色管理</h3>
+        <p style="font-size:12px; color:var(--text-dim);">設定 5 組常用庫位顏色，點擊地圖或新增庫位時可快速套用。操作員與管理員皆可使用。</p>
+        <div id="favColorList" style="display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:15px 0;"></div>
+        <button class="btn-main" style="background:#475569; width:100%;" onclick="closeModal('favColorModal')">關閉</button>
+    </div>
+</div>
+
+<!-- 回報視窗 -->
+<div id="logModal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <button class="modal-close-btn" onclick="closeModal('logModal')">✖</button>
+        <h3 id="logModalTitle" style="margin-top:0;">📢 異常回報</h3>
+        
+        <div class="auth-form-group" id="logCategoryGroup">
+            <label>回報類別</label>
+            <select id="logCategory" class="btn">
+                <option value="報廢">🗑️ 報廢</option>
+                <option value="異常">⚠️ 異常</option>
+                <option value="移位">🔄 移位</option>
+                <option value="出清">🏷️ 出清</option>
+                <option value="散貨">📦 散貨</option>
+                <option value="即期">⏳ 即期</option>
+                <option value="正常">⏳ 正常</option>
+            </select>
+        </div>
+
+        <div class="auth-form-group">
+            <label id="logModalLabel">說明與備註（選填）</label>
+            <textarea id="logMessage" class="auth-input" rows="3" placeholder="已選擇上方類別即可直接送出，如需補充可在此輸入" style="resize:vertical;"></textarea>
+        </div>
+        <button class="btn-main" style="width:100%;" onclick="submitLogEntry()">📤 送出</button>
+    </div>
+</div>
+
+<!-- 回報 / 補貨紀錄彈窗 -->
+<div id="logHistoryModal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+        <button class="modal-close-btn" onclick="closeModal('logHistoryModal')">✖</button>
+        <h3 style="margin-top:0;">📋 回報 / 補貨紀錄</h3>
+        <div id="logHistoryList" style="display:flex; flex-direction:column; gap:10px; max-height:50vh; overflow-y:auto;"></div>
+        <button class="btn-main" style="background:#475569; width:100%; margin-top:15px;" onclick="closeModal('logHistoryModal')">關閉</button>
+    </div>
+</div>
+
+<!-- 自訂欄位管理彈窗 -->
+<div id="customFieldModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close-btn" onclick="closeModal('customFieldModal')">✖</button>
+        <h3 style="margin-top:0;">⚙️ 自訂欄位管理</h3>
+        <p style="font-size:12px; color:var(--text-dim);">新增後，欄位會出現在「新增入庫建檔」表單與庫存列表中。</p>
+        <div id="customFieldList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
+        <div style="border-top:1px dashed var(--border); padding-top:15px;">
+            <b>➕ 新增欄位</b>
+            <input type="text" id="cfNewLabel" class="btn" placeholder="欄位名稱 (例如: 供應商)" style="margin-top:8px;">
+            <button class="btn-main" style="width:100%; margin-top:10px; background:var(--edit);" onclick="addCustomField()">➕ 新增欄位</button>
+        </div>
+        <button class="btn-main" style="background:#475569; width:100%; margin-top:15px;" onclick="closeModal('customFieldModal')">關閉</button>
+    </div>
+</div>
+
+<!-- 管理員字卡編輯 -->
+<div id="marqueeEditModal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+        <button class="modal-close-btn" onclick="closeModal('marqueeEditModal')">✖</button>
+        <h3 style="margin-top:0;">✏️ 編輯公告字卡</h3>
+        <p style="font-size:12px;color:var(--text-dim);">公告可依目前資料表分開保存；切換資料表後會顯示該表自己的字卡。</p>
+        <textarea id="marqueeEditText" class="auth-input" rows="4" placeholder="輸入要顯示在上方字卡的內容"></textarea>
+        <div style="display:flex;gap:10px;margin-top:15px;">
+            <button class="btn-main admin-edit-btn" style="flex:1;" onclick="saveMarqueeText()">💾 儲存</button>
+            <button class="btn-main" style="flex:1;background:#475569;" onclick="closeModal('marqueeEditModal')">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 管理員編輯備註與狀態彈窗 -->
+<div id="noteStatusEditModal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <button class="modal-close-btn" onclick="closeModal('noteStatusEditModal')">✖</button>
+        <h3 style="margin-top:0; color:var(--primary);">✏️ 管理員編輯 備註與狀態</h3>
+        <input type="hidden" id="editNoteStatusItemId">
+        <div class="auth-form-group">
+            <label>狀態標籤</label>
+            <input type="text" id="editStatusTagInput" class="auth-input" placeholder="例如：報廢, 移位, 待檢 (留空則清除狀態)">
+        </div>
+        <div class="auth-form-group">
+            <label>備註內容</label>
+            <textarea id="editNoteInput" class="auth-input" rows="3" placeholder="請輸入備註內容"></textarea>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button class="btn-main admin-edit-btn" style="flex:1;" onclick="saveNoteAndStatus()">💾 儲存變更</button>
+            <button class="btn-main" style="background:var(--danger); flex:1;" onclick="clearNoteAndStatus()">🗑️ 一鍵清空</button>
+        </div>
+    </div>
+</div>
+
+<!-- 管理員編輯庫存資料 -->
+<div id="itemEditModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close-btn" onclick="closeModal('itemEditModal')">✖</button>
+        <h3 style="margin-top:0;">✏️ 編輯庫存資料</h3>
+        <input type="hidden" id="editItemId">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+            <select id="editZone" class="btn"></select>
+            <select id="editFloor" class="btn"></select>
+            <input type="number" id="editPos" placeholder="儲位號" class="btn">
+            <input type="text" id="editName" placeholder="產品名稱" class="btn">
+            <input type="text" id="editBatch" placeholder="批號" class="btn">
+            <input type="date" id="editDate" class="btn" title="有效日期">
+            <input type="number" id="editAging" placeholder="熟成天數 (如: 45)" class="btn" title="熟成天數" oninput="handleEditAgingInput()">
+            <input type="text" id="editNote" placeholder="備註" class="btn">
+            <input type="color" id="editColor" class="btn" style="padding:2px;height:40px;">
+        </div>
+        <div id="editCustomFieldsContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:10px;"></div>
+        <div style="display:flex;gap:10px;margin-top:15px;">
+            <button class="btn-main admin-edit-btn" style="flex:1;" onclick="saveItemEdit()">💾 儲存修改</button>
+            <button class="btn-main" style="flex:1;background:#475569;" onclick="closeModal('itemEditModal')">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 區域管理彈窗 -->
+<div id="zoneManageModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close-btn" onclick="closeModal('zoneManageModal')">✖</button>
+        <h3>🏭 倉儲區域格局管理</h3>
+        <div id="zoneManageList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
+        <div style="border-top:1px dashed var(--border); padding-top:15px;">
+            <b>➕ 新增區域</b>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px; margin-top:8px;">
+                <input type="text" id="zmNewName" class="btn" placeholder="區域名稱">
+                <input type="number" id="zmNewFloors" class="btn" placeholder="樓層" value="1">
+                <input type="number" id="zmNewPerFloor" class="btn" placeholder="每層號碼" value="10">
+            </div>
+            <button class="btn-main" style="width:100%; margin-top:10px; background:var(--edit);" onclick="addZoneEntry()">➕ 新增區域</button>
+        </div>
+        <button class="btn-main" style="background:#475569; width:100%; margin-top:15px;" onclick="closeModal('zoneManageModal')">關閉</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    /* ============ 核心 State 控制 ============ */
+    let currentUser = JSON.parse(sessionStorage.getItem('warehouse_user') || 'null');
+    let ZONE_SETUP = JSON.parse(localStorage.getItem('warehouse_zone_setup') || 'null');
+    let BACKEND_CONFIG = JSON.parse(localStorage.getItem('warehouse_backend_config') || 'null');
+    let WAREHOUSE_SETUP = JSON.parse(localStorage.getItem('warehouse_setup_config') || 'null');
+
+    let inventory = [];
+    let supabaseClient = null;
+    let isOfflineMode = false;
+    let currentSort = { key: null, dir: 1 };
+
+    /* 搜尋與篩選狀態 */
+    let activeExpFilter = null; // { min, max }
+    let selectedSlotFilter = null; // { zone, floor, pos }
+    let searchQuery = '';
+
+    /* 分頁控制狀態 (固定 10 筆) */
+    let currentPage = 1;
+    const pageSize = 10;
+
+    /* 我的最愛顏色 */
+    let FAV_COLORS = JSON.parse(localStorage.getItem('warehouse_fav_colors') || 'null') || ['#38bdf8', '#a855f7', '#f59e0b', '#ec4899', '#34d399'];
+
+    /* 自訂欄位 */
+    let CUSTOM_FIELDS = JSON.parse(localStorage.getItem('warehouse_custom_fields') || '[]');
+
+    /* 資料表選擇 */
+    let TABLE_LIST = JSON.parse(localStorage.getItem('warehouse_table_list') || 'null') || ['inventory'];
+    let CURRENT_TABLE = localStorage.getItem('warehouse_current_table') || 'inventory';
+    let TABLE_ZONE_SETUP = JSON.parse(localStorage.getItem('warehouse_table_zone_setup') || '{}');
+    let TABLE_MARQUEES = JSON.parse(localStorage.getItem('warehouse_table_marquees') || '{}');
+    let FETCH_TOKEN = 0;
+
+    let logModalContext = { itemId: null, type: null };
+
+    // 初始化 Supabase 連線
+    function initSupabase() {
+        if (BACKEND_CONFIG && BACKEND_CONFIG.mode === 'supabase' && BACKEND_CONFIG.supabaseUrl && BACKEND_CONFIG.supabaseKey) {
+            const { createClient } = supabase;
+            supabaseClient = createClient(BACKEND_CONFIG.supabaseUrl, BACKEND_CONFIG.supabaseKey);
+            console.log("✅ Supabase 連線已初始化");
+        }
+    }
+
+    window.onload = async function() {
+        applySharedConfigFromUrl();
+
+        if (!WAREHOUSE_SETUP) {
+            startOnboardingWizard();
+            return;
+        }
+        applyBrandSettings();
+        initSupabase();
+
+        if (currentUser) {
+            initApp();
+            return;
+        }
+
+        /* 因與 reg1.html 同網域，若瀏覽器已有登入中的共用 Supabase Auth session，直接沿用免重複登入 */
+        try {
+            initAuthClient();
+            const { data } = await authClient.auth.getSession();
+            if (data && data.session && data.session.user) {
+                const meta = data.session.user.user_metadata || {};
+                const role = meta.role || meta.warehouse_role || 'operator';
+                currentUser = { username: data.session.user.email, role };
+                sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                initApp();
+                return;
+            }
+        } catch (e) {
+            console.warn('偵測既有 Supabase Auth session 失敗：', e);
+        }
+
+        document.getElementById('authModal').style.display = 'flex';
+    };
+
+    /* ============ 一次設定，分享給其他裝置 ============ */
+    // UTF-8 安全的 Base64 編碼／解碼（中文品牌名稱、區域名稱皆可正確還原）
+    function b64EncodeUnicode(str) {
+        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+    }
+    function b64DecodeUnicode(str) {
+        return decodeURIComponent(Array.prototype.map.call(atob(str), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }
+
+    // 若網址帶有分享設定字串，自動套用到本機（localStorage），並清除網址列，避免重複套用或外洩
+    function applySharedConfigFromUrl() {
+        try {
+            const hash = window.location.hash || '';
+            const marker = '#cfg=';
+            if (!hash.startsWith(marker)) return false;
+            const encoded = hash.substring(marker.length);
+            if (!encoded) return false;
+
+            const payload = JSON.parse(b64DecodeUnicode(decodeURIComponent(encoded)));
+
+            const map = {
+                WAREHOUSE_SETUP: 'warehouse_setup_config',
+                ZONE_SETUP: 'warehouse_zone_setup',
+                BACKEND_CONFIG: 'warehouse_backend_config',
+                CUSTOM_FIELDS: 'warehouse_custom_fields',
+                TABLE_LIST: 'warehouse_table_list',
+                TABLE_ZONE_SETUP: 'warehouse_table_zone_setup',
+                TABLE_MARQUEES: 'warehouse_table_marquees',
+                FAV_COLORS: 'warehouse_fav_colors'
+            };
+
+            Object.keys(map).forEach(key => {
+                if (payload[key] !== undefined) {
+                    localStorage.setItem(map[key], JSON.stringify(payload[key]));
+                }
+            });
+
+            // 重新載入至記憶體中的變數，讓本次頁面就能直接生效
+            WAREHOUSE_SETUP = JSON.parse(localStorage.getItem('warehouse_setup_config') || 'null');
+            ZONE_SETUP = JSON.parse(localStorage.getItem('warehouse_zone_setup') || 'null');
+            BACKEND_CONFIG = JSON.parse(localStorage.getItem('warehouse_backend_config') || 'null');
+            CUSTOM_FIELDS = JSON.parse(localStorage.getItem('warehouse_custom_fields') || '[]');
+            TABLE_LIST = JSON.parse(localStorage.getItem('warehouse_table_list') || 'null') || ['inventory'];
+            TABLE_ZONE_SETUP = JSON.parse(localStorage.getItem('warehouse_table_zone_setup') || '{}');
+            TABLE_MARQUEES = JSON.parse(localStorage.getItem('warehouse_table_marquees') || '{}');
+            FAV_COLORS = JSON.parse(localStorage.getItem('warehouse_fav_colors') || 'null') || FAV_COLORS;
+
+            // 清除網址列上的設定字串，避免外洩／重整頁面時重複解析
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            return true;
+        } catch (e) {
+            console.error('套用分享設定失敗:', e);
+            return false;
+        }
+    }
+
+    // 產生「一次設定、其他裝置直接用」的分享連結
+    function buildShareLink() {
+        const payload = {
+            WAREHOUSE_SETUP,
+            ZONE_SETUP,
+            BACKEND_CONFIG,
+            CUSTOM_FIELDS,
+            TABLE_LIST,
+            TABLE_ZONE_SETUP,
+            TABLE_MARQUEES,
+            FAV_COLORS
+        };
+        const encoded = encodeURIComponent(b64EncodeUnicode(JSON.stringify(payload)));
+        return window.location.origin + window.location.pathname + '#cfg=' + encoded;
+    }
+
+    function openShareModal() {
+        const link = buildShareLink();
+        document.getElementById('shareLinkInput').value = link;
+
+        const qrBox = document.getElementById('qrcodeContainer');
+        qrBox.innerHTML = '';
+        if (window.QRCode) {
+            try {
+                // typeNumber:0 讓函式庫依內容長度「自動」選擇合適的 QRCode 版本，
+                // 避免內容（設定資料）過長時，固定版本塞不下導致產生的 QRCode 無法辨識／掃描失敗。
+                // correctLevel 使用 L（容錯率最低但可容納資料量最大），並放大尺寸方便掃描。
+                new QRCode(qrBox, {
+                    text: link,
+                    width: 260,
+                    height: 260,
+                    typeNumber: 0,
+                    correctLevel: QRCode.CorrectLevel.L,
+                    colorDark: '#0f172a',
+                    colorLight: '#ffffff'
+                });
+            } catch (e) {
+                // 內容超過 QRCode 最大容量（約 40 版上限）時，改用文字提示，避免顯示壞掉、無法辨識的圖案
+                console.error('QRCode 產生失敗:', e);
+                qrBox.innerHTML = '<div style="color:#0f172a; font-size:12px; padding:20px; max-width:260px;">⚠️ 目前設定資料過長，無法產生可辨識的 QRCode，請改用下方「複製連結」分享給其他裝置。</div>';
+            }
+        } else {
+            qrBox.innerHTML = '<div style="color:#0f172a; font-size:12px; padding:20px;">QRCode 函式庫載入失敗，請改用下方連結分享</div>';
+        }
+
+        document.getElementById('shareLinkModal').style.display = 'flex';
+    }
+
+    function copyShareLink() {
+        const input = document.getElementById('shareLinkInput');
+        input.select();
+        input.setSelectionRange(0, 99999);
+        navigator.clipboard && navigator.clipboard.writeText(input.value).then(() => {
+            showToast('📋 分享連結已複製，可傳送給其他裝置');
+        }).catch(() => {
+            document.execCommand('copy');
+            showToast('📋 分享連結已複製，可傳送給其他裝置');
+        });
+    }
+
+    function applyBrandSettings() {
+        if (WAREHOUSE_SETUP && WAREHOUSE_SETUP.brand) {
+            document.getElementById('sysTitleDisplay').innerText = "📦 " + WAREHOUSE_SETUP.brand;
+            document.getElementById('appBrandTitle').innerText = WAREHOUSE_SETUP.brand;
+            document.title = WAREHOUSE_SETUP.brand;
+        }
+    }
+
+    function switchAuthTab(type) {
+        document.getElementById('tabLogin').classList.toggle('active', type === 'login');
+        document.getElementById('tabReg').classList.toggle('active', type === 'reg');
+        document.getElementById('formLogin').style.display = type === 'login' ? 'block' : 'none';
+        document.getElementById('formReg').style.display = type === 'reg' ? 'block' : 'none';
+        if (type === 'reg') {
+            refreshAdminRegistrationLock();
+        }
+    }
+
+    /* ============ 管理員唯一性檢查（前台輔助提示） ============
+       這裡只是「前台」的體驗優化：若偵測到雲端已有一位管理員，就先在下拉選單把
+       「系統管理員」選項鎖起來，讓使用者不用送出才知道不能選。
+       ⚠️ 這不是真正安全的防護——任何人打開瀏覽器開發者工具都能繞過前端檢查。
+       真正能擋住「已有管理員就禁止再註冊」的防護，必須設在後台（Supabase 資料庫），
+       用資料庫觸發器在帳號寫入當下擋下第二個 admin 註冊。作法請見隨附的
+       supabase_single_admin_setup.sql（貼到 Supabase SQL Editor 執行一次即可）。
+       若尚未在後台建立 system_meta 資料表，這裡的查詢會直接失敗並略過，
+       不會影響一般註冊流程。 */
+    async function refreshAdminRegistrationLock() {
+        const regRoleSelect = document.getElementById('regRole');
+        const adminOption = regRoleSelect && regRoleSelect.querySelector('option[value="admin"]');
+        const operatorOption = regRoleSelect && regRoleSelect.querySelector('option[value="operator"]');
+        if (!regRoleSelect || !adminOption) return;
+
+        adminOption.disabled = false;
+        adminOption.text = '系統管理員 (全權限)';
+        if (operatorOption) operatorOption.disabled = false;
+
+        // 預設先依本機「尚未完成第一位管理員」狀態處理。
+        // 這能解決第一次開啟網頁、system_meta 尚未建立時，
+        // 管理員選項沒有正確進入初始化流程的問題。
+        if (FIRST_ADMIN_MODE) {
+            regRoleSelect.value = 'admin';
+            adminOption.disabled = false;
+            adminOption.text = '系統管理員（首次使用，建立第一位管理員）';
+            if (operatorOption) operatorOption.disabled = true;
+        }
+
+        try {
+            initAuthClient();
+            const { data, error } = await authClient
+                .from('system_meta')
+                .select('admin_registered')
+                .eq('id', 1)
+                .maybeSingle();
+
+            if (!error && data) {
+                if (data.admin_registered) {
+                    // 雲端已經有管理員：禁止再建立第二位管理員。
+                    FIRST_ADMIN_MODE = false;
+                    localStorage.setItem('warehouse_admin_initialized', '1');
+                    adminOption.disabled = true;
+                    adminOption.text = '系統管理員（已有管理員，無法再註冊）';
+                    if (regRoleSelect.value === 'admin') regRoleSelect.value = 'operator';
+                    if (operatorOption) operatorOption.disabled = false;
+                } else {
+                    // system_meta 明確表示尚未有管理員。
+                    FIRST_ADMIN_MODE = true;
+                    localStorage.removeItem('warehouse_admin_initialized');
+                    regRoleSelect.value = 'admin';
+                    adminOption.disabled = false;
+                    adminOption.text = '系統管理員（建立第一位管理員）';
+                    if (operatorOption) operatorOption.disabled = true;
+                }
+                return;
+            }
+
+            // system_meta 尚未建立 / RLS 暫時無法讀取：
+            // 不因這個輔助檢查失敗而阻斷第一次管理員註冊。
+            if (FIRST_ADMIN_MODE) {
+                regRoleSelect.value = 'admin';
+                adminOption.disabled = false;
+                adminOption.text = '系統管理員（首次使用，建立第一位管理員）';
+                if (operatorOption) operatorOption.disabled = true;
+            }
+        } catch (e) {
+            console.warn('管理員狀態檢查略過：', e);
+        }
+    }
+
+
+    /* ============ 共用帳號系統：與 reg1.html 使用同一個 Supabase Auth 專案 ============
+       這裡的帳號是真正的 Supabase Auth（GoTrue）帳號，密碼由 Supabase 安全雜湊保存，
+       只要輸入相同的電子郵件／密碼，不論在 reg1.html 或本系統，任何裝置都能登入同一組帳號。 */
+    const SHARED_AUTH_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co/';
+    const SHARED_AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eHBrYWxydWdscGV1ZnR3bWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczODY3MDQsImV4cCI6MjEwMjk2MjcwNH0.LbV5Arfmebs9sRFTuBM8l2XvaerkJ-wIkNETsG6p2EI';
+    let authClient = null;
+
+    // 首次使用保護：當本機尚未完成第一位管理員建立時，
+    // 註冊頁預設只能建立「系統管理員」，避免第一次誤建成操作員。
+    // 雲端 system_meta 若存在，則以雲端狀態為準。
+    let FIRST_ADMIN_MODE = localStorage.getItem('warehouse_admin_initialized') !== '1';
+
+    function initAuthClient() {
+        if (!authClient) {
+            const { createClient } = supabase;
+            authClient = createClient(SHARED_AUTH_URL, SHARED_AUTH_KEY);
+        }
+        return authClient;
+    }
+
+    async function handleLogin() {
+        const u = document.getElementById('loginUser').value.trim();
+        const p = document.getElementById('loginPass').value.trim();
+        if (!u || !p) { alert('請輸入電子郵件與密碼'); return; }
+
+        initAuthClient();
+        document.getElementById('loader').style.display = 'flex';
+        try {
+            const { data, error } = await authClient.auth.signInWithPassword({ email: u, password: p });
+            document.getElementById('loader').style.display = 'none';
+            if (error) { alert('登入失敗：' + error.message); return; }
+
+            const meta = data.user.user_metadata || {};
+            const role = meta.role || meta.warehouse_role || 'operator';
+            currentUser = { username: data.user.email, role };
+            sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+            document.getElementById('authModal').style.display = 'none';
+            initApp();
+        } catch (err) {
+            document.getElementById('loader').style.display = 'none';
+            alert('登入時發生錯誤：' + err.message);
+        }
+    }
+
+    async function handleRegister() {
+        const u = document.getElementById('regUser').value.trim();
+        const p = document.getElementById('regPass').value.trim();
+
+        // 第一次使用時，第一個帳號固定建立為管理員。
+        // 不再讓使用者因下拉選錯「操作員」而造成系統沒有管理員。
+        const selectedRole = document.getElementById('regRole').value;
+        const r = FIRST_ADMIN_MODE ? 'admin' : selectedRole;
+
+        if (!u || !p) {
+            alert('請填寫完整註冊資訊（電子郵件與密碼）');
+            return;
+        }
+        if (p.length < 6) {
+            alert('密碼至少需要 6 位字元');
+            return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) {
+            alert('請輸入有效的電子郵件地址');
+            return;
+        }
+
+        initAuthClient();
+        document.getElementById('loader').style.display = 'flex';
+
+        try {
+            const { data, error } = await authClient.auth.signUp({
+                email: u,
+                password: p,
+                options: {
+                    data: {
+                        role: r,
+                        warehouse_role: r,
+                        first_admin: r === 'admin' && FIRST_ADMIN_MODE
+                    }
+                }
+            });
+
+            document.getElementById('loader').style.display = 'none';
+
+            if (error) {
+                const msg = String(error.message || '');
+
+                // 已存在的帳號不能重複 signUp。
+                // 只有「第一次管理員建立流程」才提供升級處理；
+                // 一般註冊仍維持原本安全行為。
+                if (r === 'admin' && FIRST_ADMIN_MODE && /already registered|user already exists|already been registered|已註冊|已存在/i.test(msg)) {
+                    const ok = confirm(
+                        '這個電子郵件已經存在於共用 Supabase 帳號系統。\n\n' +
+                        '如果這是您第一次建立本系統管理員，可以使用原本密碼登入後，將此帳號設定為第一位管理員。\n\n' +
+                        '按「確定」繼續登入並設定管理員；按「取消」返回。'
+                    );
+                    if (!ok) return;
+
+                    document.getElementById('loader').style.display = 'flex';
+                    const { data: loginData, error: loginError } =
+                        await authClient.auth.signInWithPassword({ email: u, password: p });
+
+                    if (loginError || !loginData || !loginData.user) {
+                        document.getElementById('loader').style.display = 'none';
+                        alert('無法使用此帳號建立第一位管理員：' + (loginError ? loginError.message : '登入失敗'));
+                        return;
+                    }
+
+                    const { data: updatedUser, error: updateError } =
+                        await authClient.auth.updateUser({
+                            data: {
+                                ...(loginData.user.user_metadata || {}),
+                                role: 'admin',
+                                warehouse_role: 'admin',
+                                first_admin: true
+                            }
+                        });
+
+                    if (updateError) {
+                        await authClient.auth.signOut();
+                        document.getElementById('loader').style.display = 'none';
+                        alert('帳號可以登入，但管理員權限寫入失敗：' + updateError.message);
+                        return;
+                    }
+
+                    currentUser = {
+                        username: (updatedUser && updatedUser.user)
+                            ? updatedUser.user.email
+                            : loginData.user.email,
+                        role: 'admin'
+                    };
+                    sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                    localStorage.setItem('warehouse_admin_initialized', '1');
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('authModal').style.display = 'none';
+                    alert('✅ 第一位系統管理員建立完成！');
+                    initApp();
+                    return;
+                }
+
+                if (r === 'admin' && /admin|管理員/i.test(msg)) {
+                    alert('❌ 管理員註冊失敗：' + msg);
+                } else {
+                    alert('❌ 註冊失敗：' + msg);
+                }
+                await refreshAdminRegistrationLock();
+                return;
+            }
+
+            // signUp 成功代表 Auth 帳號已建立。
+            // 有 session：直接登入；沒有 session：代表需要信箱驗證。
+            if (r === 'admin') {
+                localStorage.setItem('warehouse_admin_initialized', '1');
+            }
+
+            if (data && data.session && data.user) {
+                currentUser = {
+                    username: data.user.email,
+                    role: r
+                };
+                sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                document.getElementById('authModal').style.display = 'none';
+                alert(r === 'admin'
+                    ? '✅ 第一位系統管理員註冊成功，已自動登入。'
+                    : '✅ 註冊成功，已自動登入。');
+                initApp();
+            } else {
+                alert(r === 'admin'
+                    ? '✅ 第一位系統管理員帳號已建立！\n\n目前 Supabase 要求信箱驗證，請先到電子郵件完成驗證，再回到本頁登入。'
+                    : '✅ 註冊成功！若 Supabase 專案有開啟信箱驗證，請至信箱完成驗證後再登入。');
+                switchAuthTab('login');
+                document.getElementById('loginUser').value = u;
+                document.getElementById('loginPass').value = '';
+            }
+
+            await refreshAdminRegistrationLock();
+
+        } catch (err) {
+            document.getElementById('loader').style.display = 'none';
+            console.error('handleRegister error:', err);
+            alert('❌ 註冊時發生錯誤：' + (err && err.message ? err.message : String(err)));
+        } finally {
+            document.getElementById('loader').style.display = 'none';
+        }
+    }
+
+
+    async function handleLogout() {
+        sessionStorage.removeItem('warehouse_user');
+        try {
+            if (authClient) await authClient.auth.signOut();
+        } catch (e) {
+            console.warn('登出 Supabase Auth session 時發生錯誤：', e);
+        }
+        location.reload();
+    }
+
+    function handleGuestAccess() {
+        currentUser = { username: '訪客', role: 'guest' };
+        document.getElementById('authModal').style.display = 'none';
+        initApp();
+    }
+
+    function startOnboardingWizard() {
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('wizardModal').style.display = 'flex';
+    }
+
+    function nextWizStep(step) {
+        document.getElementById('wizardStep1').style.display = step === 1 ? 'block' : 'none';
+        document.getElementById('wizardStep2').style.display = step === 2 ? 'block' : 'none';
+        document.getElementById('wizardStep3').style.display = step === 3 ? 'block' : 'none';
+    }
+
+    function toggleWizBackendFields() {
+        const m = document.getElementById('wizBackendMode').value;
+        document.getElementById('wizGsGroup').style.display = m === 'google_gs' ? 'block' : 'none';
+        document.getElementById('wizSupaGroup').style.display = m === 'supabase' ? 'block' : 'none';
+    }
+
+    function completeOnboarding() {
+        const brand = document.getElementById('wizBrand').value.trim() || "智慧倉儲系統";
+        const zName = document.getElementById('wizZoneName').value.trim() || "區域 A";
+        const floors = parseInt(document.getElementById('wizFloors').value) || 4;
+        const perFloor = parseInt(document.getElementById('wizPerFloor').value) || 20;
+        const mode = document.getElementById('wizBackendMode').value;
+
+        WAREHOUSE_SETUP = { brand, version: 'V28.1 Commercial' };
+        ZONE_SETUP = [{ name: zName, floors, perFloor }];
+        BACKEND_CONFIG = {
+            mode,
+            scriptUrl: document.getElementById('wizScriptUrl').value.trim(),
+            supabaseUrl: document.getElementById('wizSupaUrl').value.trim(),
+            supabaseKey: document.getElementById('wizSupaKey').value.trim()
+        };
+
+        localStorage.setItem('warehouse_setup_config', JSON.stringify(WAREHOUSE_SETUP));
+        localStorage.setItem('warehouse_zone_setup', JSON.stringify(ZONE_SETUP));
+        localStorage.setItem('warehouse_backend_config', JSON.stringify(BACKEND_CONFIG));
+
+        closeModal('wizardModal');
+        applyBrandSettings();
+        initSupabase();
+        document.getElementById('authModal').style.display = 'flex';
+    }
+
+    function initApp() {
+        document.getElementById('main-container').style.display = 'block';
+        const roleLabel = currentUser.role === 'admin' ? '管理員' : (currentUser.role === 'guest' ? '訪客・僅檢視' : '操作員');
+        document.getElementById('userBadge').innerText = `👤 ${currentUser.username} (${roleLabel})`;
+        document.getElementById('admin-panel').style.display = currentUser.role === 'admin' ? 'block' : 'none';
+        document.getElementById('zoneManageBtn').style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
+        document.getElementById('marqueeEditBtn').style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+        document.getElementById('backendSettingsBtn').style.display = currentUser.role === 'guest' ? 'none' : 'inline-flex';
+        document.getElementById('shareLinkBtn').style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+        document.getElementById('favColorBtn').style.display = currentUser.role === 'guest' ? 'none' : 'inline-flex';
+        document.getElementById('tableSelect').disabled = currentUser.role === 'guest';
+
+        renderZoneSelects();
+        renderFloorSelects();
+        renderAddColorPalette();
+        renderAddFormCustomFields();
+        renderCustomFieldHeaders();
+        renderTableSelect();
+        renderMarquee();
+        fetchData();
+    }
+
+    function getEffectiveZones() {
+        const tableZones = TABLE_ZONE_SETUP[CURRENT_TABLE];
+        if (Array.isArray(tableZones) && tableZones.length) return tableZones;
+        if (Array.isArray(ZONE_SETUP) && ZONE_SETUP.length) return ZONE_SETUP;
+        return [{ name: '預設區域', floors: 1, perFloor: 10 }];
+    }
+
+    function getCurrentMarqueeText() {
+        return TABLE_MARQUEES[CURRENT_TABLE] || '🔔 歡迎使用智慧倉儲系統，請點擊新增入庫進行初次建檔。';
+    }
+
+    function renderMarquee() {
+        const el = document.getElementById('marqueeDisplay');
+        if (el) el.innerText = getCurrentMarqueeText();
+    }
+
+    function openMarqueeEditModal() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        document.getElementById('marqueeEditText').value = getCurrentMarqueeText();
+        document.getElementById('marqueeEditModal').style.display = 'flex';
+    }
+
+    function saveMarqueeText() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const value = document.getElementById('marqueeEditText').value.trim();
+        TABLE_MARQUEES[CURRENT_TABLE] = value || '🔔 歡迎使用智慧倉儲系統，請點擊新增入庫進行初次建檔。';
+        localStorage.setItem('warehouse_table_marquees', JSON.stringify(TABLE_MARQUEES));
+        renderMarquee();
+        closeModal('marqueeEditModal');
+        showToast('✅ 字卡已更新');
+    }
+
+    function renderZoneSelects() {
+        const zones = getEffectiveZones();
+        ['vZone','addZone'].forEach(id => {
+            const el = document.getElementById(id); if(!el) return;
+            el.innerHTML = '';
+            zones.forEach(z => {
+                let opt = document.createElement('option');
+                opt.value = z.name; opt.textContent = z.name;
+                el.appendChild(opt);
+            });
+        });
+    }
+
+    function renderFloorSelects() {
+        const zones = getEffectiveZones();
+        const maxF = Math.max(...zones.map(z => z.floors || 1));
+        ['vFloor','addFloor'].forEach(id => {
+            const el = document.getElementById(id); if(!el) return;
+            el.innerHTML = '';
+            for(let i=1; i<=maxF; i++) {
+                let opt = document.createElement('option');
+                opt.value = i + 'F'; opt.textContent = i + 'F';
+                el.appendChild(opt);
+            }
+        });
+    }
+
+    function selectSlotFilter(zone, floor, pos) {
+        if (selectedSlotFilter && selectedSlotFilter.zone === zone && selectedSlotFilter.floor === floor && selectedSlotFilter.pos === pos) {
+            selectedSlotFilter = null;
+        } else {
+            selectedSlotFilter = { zone, floor, pos };
+        }
+        currentPage = 1;
+        renderVisual();
+        renderTable();
+    }
+
+    // 捲動到下方的庫存資料列表，方便手機/平板使用者不必手動往下滑
+    function scrollToInventoryTable() {
+        const target = document.querySelector('.inventory-table-wrap');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 手機/平板：偵測「點擊 2 次同一庫位」（雙擊／快速點兩下），
+    // 確保該庫位維持已選取狀態（不像單擊會切換關閉），並自動捲動到下方資料列表顯示該庫位資訊
+    let lastSlotTap = { key: null, time: 0 };
+    function handleSlotTap(zone, floor, pos) {
+        const key = `${zone}|${floor}|${pos}`;
+        const now = Date.now();
+        const isDoubleTap = lastSlotTap.key === key && (now - lastSlotTap.time) < 450;
+        lastSlotTap = { key, time: now };
+
+        if (isDoubleTap) {
+            const alreadySelected = selectedSlotFilter && selectedSlotFilter.zone === zone && selectedSlotFilter.floor === floor && Number(selectedSlotFilter.pos) === Number(pos);
+            if (!alreadySelected) selectSlotFilter(zone, floor, pos);
+            scrollToInventoryTable();
+        } else {
+            selectSlotFilter(zone, floor, pos);
+        }
+    }
+
+    /* 渲染視覺化地圖（同步顯示熟成倒數） */
+    function renderVisual() {
+        const zName = document.getElementById('vZone').value;
+        const floor = document.getElementById('vFloor').value;
+        const grid = document.getElementById('visualGrid');
+        const zoneObj = getEffectiveZones().find(z => z.name === zName);
+        const tableBadge = document.getElementById('currentTableBadge');
+        if (tableBadge) tableBadge.innerText = `目前資料表：${CURRENT_TABLE}`;
+
+        if(!zoneObj) { grid.innerHTML = '<div style="padding:20px;">尚無區域設定</div>'; return; }
+
+        grid.style.gridTemplateColumns = `repeat(${Math.min(zoneObj.perFloor, 10)}, 1fr)`;
+        grid.innerHTML = '';
+
+        let occupied = 0;
+        for(let i=1; i<=zoneObj.perFloor; i++) {
+            const items = inventory.filter(x => x.zone === zName && x.floor === floor && Number(x.pos) === i);
+            const slot = document.createElement('div');
+            
+            const isSelected = selectedSlotFilter && selectedSlotFilter.zone === zName && selectedSlotFilter.floor === floor && Number(selectedSlotFilter.pos) === i;
+            slot.className = 'slot' + (items.length ? ' occupied' : '') + (isSelected ? ' active-slot' : '');
+            
+            slot.style.touchAction = 'manipulation'; // 避免行動裝置把快速點兩下判定為縮放手勢，蓋掉雙擊事件
+            slot.onclick = function() {
+                handleSlotTap(zName, floor, i);
+            };
+
+            if(items.length) {
+                slot.style.background = items[0].color || 'var(--primary)';
+                const firstItem = items[0];
+                const agingShortText = getAgingCountdownShortText(firstItem);
+                slot.title = items.map(it => `${it.name} (${getAgingCountdownShortText(it)})`).join('\n');
+
+                slot.innerHTML = `<div>${i}</div><span class="count">${items.length} 件</span>` +
+                    (agingShortText ? `<span class="count" style="color:#f8fafc; font-weight:bold; font-size:8px; background:rgba(0,0,0,0.35); padding:1px 4px; border-radius:4px; margin-top:1px;">${agingShortText}</span>` : '') +
+                    (currentUser && currentUser.role === 'admin'
+                        ? `<button class="btn-main admin-edit-btn visual-edit-btn" onclick="event.stopPropagation();openItemEditModal('${firstItem.id}')">✏️ 編輯</button>`
+                        : '');
+                occupied++;
+            } else {
+                slot.innerHTML = `<div>${i}</div>`;
+            }
+            grid.appendChild(slot);
+        }
+        document.getElementById('floorEmptyCount').innerText = `🔲 空庫位: ${zoneObj.perFloor - occupied}`;
+
+        renderSlotColorToolbar();
+    }
+
+    function renderSlotColorToolbar() {
+        const toolbar = document.getElementById('slotColorToolbar');
+        const label = document.getElementById('slotColorToolbarLabel');
+        const palette = document.getElementById('slotFavPalette');
+
+        if (!selectedSlotFilter || currentUser.role === 'guest') {
+            toolbar.style.display = 'none';
+            return;
+        }
+
+        const items = inventory.filter(x => x.zone === selectedSlotFilter.zone && x.floor === selectedSlotFilter.floor && Number(x.pos) === Number(selectedSlotFilter.pos));
+        
+        toolbar.style.display = 'flex';
+        label.innerText = `📍 目前點選庫位: [${selectedSlotFilter.zone} ${selectedSlotFilter.floor}-${selectedSlotFilter.pos}] ${items.length ? `(已有 ${items.length} 件貨品)` : '(空庫位)'}`;
+
+        palette.innerHTML = FAV_COLORS.map(c => 
+            `<div onclick="applySlotColor('${c}')" title="套用此最愛顏色" style="width:22px; height:22px; border-radius:50%; background:${c}; cursor:pointer; border:2px solid white; box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>`
+        ).join('');
+    }
+
+    async function applySlotColor(colorHex) {
+        if (!selectedSlotFilter || currentUser.role === 'guest') return;
+        const { zone, floor, pos } = selectedSlotFilter;
+        const targetItems = inventory.filter(x => x.zone === zone && x.floor === floor && Number(x.pos) === Number(pos));
+
+        if (!targetItems.length) {
+            showToast('⚠️ 該儲位目前沒有產品，新增產品時將自動套用色彩');
+            if (colorHex) document.getElementById('addColor').value = colorHex;
+            return;
+        }
+
+        document.getElementById('loader').style.display = 'flex';
+
+        for (let item of targetItems) {
+            item.color = colorHex || '#06b6d4';
+            if (supabaseClient && !isOfflineMode) {
+                try {
+                    await supabaseClient.from(getTableName()).update({ color: item.color }).eq('id', item.id);
+                } catch (err) { console.error('雲端色彩同步失敗', err); }
+            }
+        }
+
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+        
+        showToast(colorHex ? '🎨 已套用最愛顏色！' : '🔄 已恢復原本預設顏色！');
+        renderVisual();
+        renderTable();
+    }
+
+    /* 快速熟成倒數篩選 */
+    function setExpFilter(min, max) {
+        if (activeExpFilter && activeExpFilter.min === min && activeExpFilter.max === max) {
+            activeExpFilter = null;
+        } else {
+            activeExpFilter = { min, max };
+        }
+        updateFilterButtonsUI();
+        currentPage = 1;
+        renderTable();
+    }
+
+    function clearAllFilters() {
+        activeExpFilter = null;
+        selectedSlotFilter = null;
+        searchQuery = '';
+        document.getElementById('searchInput').value = '';
+        updateFilterButtonsUI();
+        currentPage = 1;
+        renderVisual();
+        renderTable();
+    }
+
+    function updateFilterButtonsUI() {
+        document.getElementById('filter15').classList.toggle('active', activeExpFilter?.min === 1 && activeExpFilter?.max === 15);
+        document.getElementById('filter30').classList.toggle('active', activeExpFilter?.min === 16 && activeExpFilter?.max === 30);
+        document.getElementById('filter60').classList.toggle('active', activeExpFilter?.min === 31 && activeExpFilter?.max === 60);
+    }
+
+    function handleSearchInput() {
+        searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+        currentPage = 1;
+        renderTable();
+    }
+
+    /* ============ 核心修復：針對「熟成時間 / 熟成到期日」進行倒數計算 ============ */
+    function getAgingDaysLeft(item) {
+        let targetDateStr = item.agingDate;
+        if (!targetDateStr && item.aging) {
+            if (typeof item.aging === 'string' && item.aging.includes('-')) {
+                targetDateStr = item.aging;
+            } else if (!isNaN(parseInt(item.aging))) {
+                const baseDate = item.createdAt ? new Date(item.createdAt) : new Date();
+                baseDate.setDate(baseDate.getDate() + parseInt(item.aging));
+                targetDateStr = baseDate.toISOString().slice(0, 10);
+            }
+        }
+        if (!targetDateStr) return null;
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const target = new Date(targetDateStr);
+        target.setHours(0,0,0,0);
+
+        const diffTime = target - today;
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    function getAgingCountdownText(item) {
+        const diffDays = getAgingDaysLeft(item);
+        if (diffDays === null || isNaN(diffDays)) {
+            return item.aging ? `${item.aging} 天` : '-';
+        }
+        
+        if (diffDays > 1) return `<span style="color:#38bdf8; font-weight:bold;">⏳ 熟成倒數 ${diffDays} 天</span>`;
+        if (diffDays === 1) return `<span style="color:#f59e0b; font-weight:bold;">⚠️ 熟成倒數 1 天</span>`;
+        if (diffDays === 0) return `<span style="color:#10b981; font-weight:bold;">🔥 今日熟成完成</span>`;
+        return `<span style="color:#a855f7; font-weight:bold;">✅ 已熟成 ${Math.abs(diffDays)} 天</span>`;
+    }
+
+    function getAgingCountdownShortText(item) {
+        const diffDays = getAgingDaysLeft(item);
+        if (diffDays === null || isNaN(diffDays)) return '';
+        if (diffDays > 0) return `⏳倒數${diffDays}天`;
+        if (diffDays === 0) return `🔥今日熟成`;
+        return `✅已熟成${Math.abs(diffDays)}天`;
+    }
+
+    /* 取得過濾與排序後的全庫資料 */
+    function getFilteredInventory() {
+        let result = [...inventory];
+
+        if (selectedSlotFilter) {
+            result = result.filter(i => i.zone === selectedSlotFilter.zone && i.floor === selectedSlotFilter.floor && Number(i.pos) === Number(selectedSlotFilter.pos));
+        }
+
+        if (activeExpFilter) {
+            result = result.filter(i => {
+                const diffDays = getAgingDaysLeft(i);
+                if (diffDays === null) return false;
+                return diffDays >= activeExpFilter.min && diffDays <= activeExpFilter.max;
+            });
+        }
+
+        if (searchQuery) {
+            result = result.filter(i => {
+                const fullText = `${i.zone} ${i.floor}-${i.pos} ${i.name} ${i.batch} ${i.note} ${i.date} ${i.aging || ''}`.toLowerCase();
+                return fullText.includes(searchQuery);
+            });
+        }
+
+        if (currentSort.key) {
+            const key = currentSort.key;
+            result.sort((a, b) => {
+                let va, vb;
+                if (key === 'zone') {
+                    va = `${a.zone}${a.floor}${String(a.pos).padStart(6,'0')}`;
+                    vb = `${b.zone}${b.floor}${String(b.pos).padStart(6,'0')}`;
+                } else if (key === 'aging') {
+                    va = getAgingDaysLeft(a) ?? 999999;
+                    vb = getAgingDaysLeft(b) ?? 999999;
+                } else {
+                    va = (a[key] || '');
+                    vb = (b[key] || '');
+                }
+                if (va < vb) return -1 * currentSort.dir;
+                if (va > vb) return 1 * currentSort.dir;
+                return 0;
+            });
+        }
+
+        return result;
+    }
+
+    /* 一鍵匯出搜尋結果 .XLSX */
+    function exportToExcel() {
+        const dataToExport = getFilteredInventory();
+        if (!dataToExport.length) {
+            alert('當前無可匯出的搜尋結果資料！');
+            return;
+        }
+
+        const exportData = dataToExport.map((item, index) => {
+            const row = {
+                "項次": index + 1,
+                "區域": item.zone || '',
+                "樓層": item.floor || '',
+                "儲位號": item.pos || '',
+                "產品名稱": item.name || '',
+                "批號": item.batch || '',
+                "有效日期": item.date || '',
+                "熟成天數/完成日": item.aging || '',
+                "熟成倒數狀態": getAgingCountdownShortText(item) || '-',
+                "備註與狀態": (item.statusText ? `[${item.statusText}] ` : '') + (item.note || '')
+            };
+            CUSTOM_FIELDS.forEach(f => {
+                row[f.label] = item.customFields?.[f.key] || '';
+            });
+            return row;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "庫存搜尋結果");
+        const fileName = `庫存搜尋結果_${CURRENT_TABLE}_${new Date().toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        showToast('📥 已成功匯出 Excel 檔案！');
+    }
+
+    function sortTable(key) {
+        if (currentSort.key === key) {
+            currentSort.dir *= -1;
+        } else {
+            currentSort.key = key;
+            currentSort.dir = 1;
+        }
+        renderTable();
+    }
+
+    // 手機/平板排序工具列：下拉選單選欄位 + 按鈕切換方向，
+    // 底層共用同一個 currentSort 狀態，跟桌機版表頭點擊排序完全同步
+    function applyMobileSort() {
+        const key = document.getElementById('mobileSortKey').value;
+        currentSort.key = key || null;
+        if (!currentSort.dir) currentSort.dir = 1;
+        renderTable();
+    }
+
+    function toggleMobileSortDir() {
+        if (!currentSort.key) return; // 尚未選擇排序欄位時，方向鈕不動作
+        currentSort.dir *= -1;
+        renderTable();
+    }
+
+    function syncMobileSortBar() {
+        const sel = document.getElementById('mobileSortKey');
+        const dirBtn = document.getElementById('mobileSortDirBtn');
+        if (sel) sel.value = currentSort.key || '';
+        if (dirBtn) dirBtn.innerText = currentSort.dir === 1 ? '⬆️ 由小到大' : '⬇️ 由大到小';
+    }
+
+    function updateSortIcons() {
+        ['zone', 'name', 'date', 'aging', 'batch'].forEach(k => {
+            const el = document.getElementById('sortIcon-' + k);
+            if (!el) return;
+            el.innerText = currentSort.key === k ? (currentSort.dir === 1 ? '▲' : '▼') : '';
+        });
+        syncMobileSortBar();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        const filteredList = getFilteredInventory();
+        updateSortIcons();
+
+        const totalItems = filteredList.length;
+        const totalPages = Math.ceil(totalItems / pageSize) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIndex = (currentPage - 1) * pageSize;
+        const pageData = filteredList.slice(startIndex, startIndex + pageSize);
+
+        document.getElementById('pageInfo').innerText = totalItems > 0 
+            ? `顯示第 ${startIndex + 1} - ${Math.min(startIndex + pageSize, totalItems)} 筆，共 ${totalItems} 筆`
+            : `顯示第 0 - 0 筆，共 0 筆`;
+        document.getElementById('pageNumberDisplay').innerText = `${currentPage} / ${totalPages}`;
+
+        const colSpan = 8 + CUSTOM_FIELDS.length;
+        if (pageData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:30px; color:var(--text-dim);">目前無符合條件的庫存資料。</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = pageData.map(i => `
+            <tr>
+                <td data-label="儲位位置">
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${i.color || 'var(--primary)'}; margin-right:6px;"></span>
+                    <b>${i.zone ?? '-'} ${i.floor ?? '-'}-${i.pos ?? '-'}</b>
+                </td>
+                <td data-label="產品名稱">${i.name ?? '-'}</td>
+                <td data-label="有效日期">${i.date || '-'}</td>
+                <td data-label="熟成倒數">${getAgingCountdownText(i)}</td>
+                <td data-label="批號"><code>${i.batch || '-'}</code></td>
+                ${renderCustomFieldCells(i)}
+                <td data-label="備註與狀態">
+                    <div class="cell-value-group" style="align-items:flex-end;">
+                        <div>${i.note || '-'}</div>
+                        ${i.statusText ? `<div class="status-tag">📍 ${i.statusText}</div>` : ''}
+                        ${currentUser.role === 'admin' ? `
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn-main admin-edit-btn" style="padding:2px 6px; font-size:10px;" onclick="openNoteStatusEditModal('${i.id}')">✏️ 編輯</button>
+                                <button class="btn-main" style="background:var(--danger); padding:2px 6px; font-size:10px;" onclick="deleteNoteAndStatus('${i.id}')">🗑️ 刪除</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </td>
+                <td data-label="回報/補貨">
+                    <div class="cell-value-group" style="align-items:flex-end;">
+                        ${currentUser.role !== 'guest' ? `
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn-main" style="background:#f59e0b; padding:4px 8px; font-size:11px;" onclick="openLogModal('${i.id}','report')">📢 回報</button>
+                                <button class="btn-main" style="background:#0ea5e9; padding:4px 8px; font-size:11px;" onclick="executeDirectRestock('${i.id}')">📦 補貨</button>
+                            </div>
+                        ` : '-'}
+                        ${(i.logs && i.logs.length) ? `<a href="#" style="font-size:11px; color:var(--text-dim);" onclick="viewLogHistory('${i.id}'); return false;">📋 紀錄 (${i.logs.length})</a>` : ''}
+                    </div>
+                </td>
+                <td data-label="操作">
+                    ${currentUser.role === 'admin' ? `
+                        <div class="cell-value-group" style="flex-direction:row; gap:6px;">
+                            <button class="btn-main admin-edit-btn" style="padding:4px 8px;font-size:12px;" onclick="openItemEditModal('${i.id}')">✏️ 編輯</button>
+                            <button class="btn-main" style="background:var(--danger);padding:4px 8px;font-size:12px;" onclick="deleteItem('${i.id}')">🗑️ 刪除</button>
+                        </div>
+                    ` : '-'}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function changePage(delta) {
+        const filteredList = getFilteredInventory();
+        const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
+        currentPage += delta;
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        renderTable();
+    }
+
+    function goToPage(target) {
+        const filteredList = getFilteredInventory();
+        const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
+        if (target === 'last') currentPage = totalPages;
+        else currentPage = Number(target) || 1;
+        renderTable();
+    }
+
+    function renderCustomFieldCells(item) {
+        if (!CUSTOM_FIELDS.length) return '';
+        return CUSTOM_FIELDS.map(f => {
+            const val = (item.customFields && item.customFields[f.key]) ? item.customFields[f.key] : '-';
+            return `<td data-label="${f.label}">${val}</td>`;
+        }).join('');
+    }
+
+    /* === 我的最愛顏色 === */
+    function openFavColorModal() {
+        renderFavColorList();
+        document.getElementById('favColorModal').style.display = 'flex';
+    }
+
+    function renderFavColorList() {
+        const container = document.getElementById('favColorList');
+        container.innerHTML = FAV_COLORS.map((c, idx) => `
+            <div style="text-align:center;">
+                <input type="color" value="${c}" onchange="updateFavColor(${idx}, this.value)" style="width:100%; height:40px; border:none; border-radius:8px; cursor:pointer; background:${c};">
+                <div style="font-size:10px; color:var(--text-dim); margin-top:4px;">最愛 ${idx + 1}</div>
+            </div>
+        `).join('');
+    }
+
+    function updateFavColor(idx, color) {
+        FAV_COLORS[idx] = color;
+        localStorage.setItem('warehouse_fav_colors', JSON.stringify(FAV_COLORS));
+        renderFavColorList();
+        renderAddColorPalette();
+        renderSlotColorToolbar();
+        showToast('🎨 已更新最愛顏色');
+    }
+
+    function renderAddColorPalette() {
+        const el = document.getElementById('addColorPalette');
+        if (!el) return;
+        el.innerHTML = FAV_COLORS.map(c => `<div onclick="document.getElementById('addColor').value='${c}'" title="${c}" style="width:20px; height:20px; border-radius:50%; background:${c}; cursor:pointer; border:1px solid var(--border);"></div>`).join('');
+    }
+
+    function openNoteStatusEditModal(itemId) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const item = inventory.find(x => String(x.id) === String(itemId));
+        if (!item) return;
+
+        document.getElementById('editNoteStatusItemId').value = itemId;
+        document.getElementById('editStatusTagInput').value = item.statusText || '';
+        document.getElementById('editNoteInput').value = item.note || '';
+        document.getElementById('noteStatusEditModal').style.display = 'flex';
+    }
+
+    async function saveNoteAndStatus() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const id = document.getElementById('editNoteStatusItemId').value;
+        const item = inventory.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const newStatus = document.getElementById('editStatusTagInput').value.trim();
+        const newNote = document.getElementById('editNoteInput').value.trim();
+
+        item.statusText = newStatus;
+        item.note = newNote;
+
+        document.getElementById('loader').style.display = 'flex';
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                await supabaseClient.from(getTableName()).update({ statusText: newStatus, note: newNote }).eq('id', id);
+            } catch (err) { console.error('同步雲端失敗', err); }
+        }
+
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+        closeModal('noteStatusEditModal');
+        showToast('💾 備註與狀態已更新！');
+        renderTable();
+    }
+
+    async function clearNoteAndStatus() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        document.getElementById('editStatusTagInput').value = '';
+        document.getElementById('editNoteInput').value = '';
+        await saveNoteAndStatus();
+    }
+
+    async function deleteNoteAndStatus(itemId) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        if (!confirm('確定要刪除/清空此筆項目的備註與狀態嗎？')) return;
+
+        const item = inventory.find(x => String(x.id) === String(itemId));
+        if (!item) return;
+
+        item.statusText = '';
+        item.note = '';
+
+        document.getElementById('loader').style.display = 'flex';
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                await supabaseClient.from(getTableName()).update({ statusText: '', note: '' }).eq('id', itemId);
+            } catch (err) { console.error('同步雲端失敗', err); }
+        }
+
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+        showToast('🗑️ 已清除備註與狀態！');
+        renderTable();
+    }
+
+    async function executeDirectRestock(itemId) {
+        const item = inventory.find(x => String(x.id) === String(itemId));
+        if (!item) return;
+
+        const targetName = (item.name || '').trim().toLowerCase();
+        const matches = inventory.filter(x => (x.name || '').trim().toLowerCase() === targetName);
+        const locations = matches.map(m => `${m.zone} ${m.floor}-${m.pos}`);
+
+        let resultMsg = "";
+        if (locations.length > 0) {
+            resultMsg = `[補貨相符庫位: ${locations.join(', ')}]`;
+        } else {
+            resultMsg = `[補貨搜尋: 無其他相符庫位]`;
+        }
+
+        if (item.note && item.note.trim()) {
+            item.note = `${item.note} ${resultMsg}`;
+        } else {
+            item.note = resultMsg;
+        }
+
+        if (!item.logs) item.logs = [];
+        item.logs.push({
+            type: 'restock',
+            category: '補貨',
+            message: `一鍵補貨搜尋結果寫入備註：${resultMsg}`,
+            user: currentUser.username,
+            time: new Date().toLocaleString('zh-TW')
+        });
+
+        document.getElementById('loader').style.display = 'flex';
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                await supabaseClient.from(getTableName()).update({ note: item.note, logs: item.logs }).eq('id', itemId);
+            } catch (err) { console.error('雲端補貨同步失敗', err); }
+        }
+
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+        showToast('📦 補貨結果已直接寫入備註欄位！');
+        renderTable();
+    }
+
+    function openLogModal(itemId, type) {
+        logModalContext = { itemId, type };
+        document.getElementById('logModalTitle').innerText = '📢 異常回報';
+        document.getElementById('logModalLabel').innerText = '說明與備註';
+        document.getElementById('logMessage').value = '';
+        document.getElementById('logCategoryGroup').style.display = 'block';
+        document.getElementById('logModal').style.display = 'flex';
+    }
+
+    async function submitLogEntry() {
+        const { itemId, type } = logModalContext;
+        const message = document.getElementById('logMessage').value.trim();
+        const category = document.getElementById('logCategory').value;
+
+        // 只要有選擇「回報類別」下拉選單即可送出，不強制要求輸入文字說明；
+        // 僅在完全沒有類別、也沒有文字內容時才擋下（正常情況下下拉選單一定有預設值，此判斷主要作為保險）
+        if (!category && !message) { alert('請選擇回報類別或輸入說明內容'); return; }
+
+        const item = inventory.find(x => String(x.id) === String(itemId));
+        if (!item) return;
+        if (!item.logs) item.logs = [];
+
+        const logItem = {
+            type,
+            category,
+            message,
+            user: currentUser.username,
+            time: new Date().toLocaleString('zh-TW')
+        };
+        item.logs.push(logItem);
+        item.statusText = `${category}`;
+
+        document.getElementById('loader').style.display = 'flex';
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                const { error } = await supabaseClient.from(getTableName()).update({ logs: item.logs, statusText: item.statusText }).eq('id', itemId);
+                if (error) throw error;
+                showToast('📢 回報已送出並同步雲端');
+            } catch (err) {
+                alert(formatSupabaseColumnError(err, ['logs']));
+            }
+        } else {
+            showToast('📢 回報已記錄');
+        }
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+
+        document.getElementById('loader').style.display = 'none';
+        closeModal('logModal');
+        renderTable();
+    }
+
+    function viewLogHistory(itemId) {
+        const item = inventory.find(x => String(x.id) === String(itemId));
+        const list = document.getElementById('logHistoryList');
+        if (!item || !item.logs || !item.logs.length) {
+            list.innerHTML = `<div style="color:var(--text-dim); font-size:13px;">尚無紀錄</div>`;
+        } else {
+            list.innerHTML = item.logs.slice().reverse().map(l => `
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:10px 14px;">
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim);">
+                        <span>📢 [${l.category || '回報'}] · ${l.user}</span>
+                        <span>${l.time}</span>
+                    </div>
+                    <div style="margin-top:6px; font-size:13px;">${l.message || ''}</div>
+                </div>
+            `).join('');
+        }
+        document.getElementById('logHistoryModal').style.display = 'flex';
+    }
+
+    /* === 自訂欄位管理 === */
+    function openCustomFieldModal() {
+        renderCustomFieldList();
+        document.getElementById('customFieldModal').style.display = 'flex';
+    }
+
+    function renderCustomFieldList() {
+        const list = document.getElementById('customFieldList');
+        if (!CUSTOM_FIELDS.length) {
+            list.innerHTML = `<div style="color:var(--text-dim); font-size:13px;">尚無自訂欄位</div>`;
+            return;
+        }
+        list.innerHTML = CUSTOM_FIELDS.map((f, idx) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:12px; border:1px solid var(--border);">
+                <b>${f.label}</b>
+                <button class="btn-main" style="background:var(--danger); padding:6px 10px; font-size:12px;" onclick="deleteCustomField(${idx})">🗑️ 刪除</button>
+            </div>
+        `).join('');
+    }
+
+    function addCustomField() {
+        const label = document.getElementById('cfNewLabel').value.trim();
+        if (!label) { alert('請輸入欄位名稱'); return; }
+        if (CUSTOM_FIELDS.some(f => f.label === label)) { alert('該欄位名稱已存在'); return; }
+
+        const key = 'cf_' + label.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '_' + Date.now().toString(36);
+        CUSTOM_FIELDS.push({ key, label });
+        localStorage.setItem('warehouse_custom_fields', JSON.stringify(CUSTOM_FIELDS));
+
+        document.getElementById('cfNewLabel').value = '';
+        renderCustomFieldList();
+        renderCustomFieldHeaders();
+        renderAddFormCustomFields();
+        renderTable();
+        showToast('✅ 自訂欄位新增成功');
+    }
+
+    function deleteCustomField(idx) {
+        if (!confirm(`確定要刪除欄位「${CUSTOM_FIELDS[idx].label}」嗎？(已填入的資料將不再顯示)`)) return;
+        CUSTOM_FIELDS.splice(idx, 1);
+        localStorage.setItem('warehouse_custom_fields', JSON.stringify(CUSTOM_FIELDS));
+        renderCustomFieldList();
+        renderCustomFieldHeaders();
+        renderAddFormCustomFields();
+        renderTable();
+        showToast('🗑️ 自訂欄位已刪除');
+    }
+
+    function renderCustomFieldHeaders() {
+        document.querySelectorAll('.custom-field-th').forEach(el => el.remove());
+        const noteHeader = document.getElementById('noteHeader');
+        if (!noteHeader) return;
+        CUSTOM_FIELDS.forEach(f => {
+            const th = document.createElement('th');
+            th.className = 'custom-field-th';
+            th.innerText = f.label;
+            noteHeader.parentNode.insertBefore(th, noteHeader);
+        });
+    }
+
+    function renderAddFormCustomFields() {
+        const container = document.getElementById('addCustomFieldsContainer');
+        if (!container) return;
+        container.innerHTML = CUSTOM_FIELDS.map(f => `<input type="text" id="addCF_${f.key}" placeholder="${f.label}" class="btn">`).join('');
+    }
+
+    /* === 資料表選擇 === */
+    function getTableName() { return CURRENT_TABLE; }
+    function getLocalCacheKey() { return 'warehouse_local_inventory_' + CURRENT_TABLE; }
+
+    function renderTableSelect() {
+        const el = document.getElementById('tableSelect');
+        if (!el) return;
+        el.innerHTML = TABLE_LIST.map(t => `<option value="${t}" ${t === CURRENT_TABLE ? 'selected' : ''}>${t}</option>`).join('')
+            + `<option value="__add_new__">➕ 新增資料表...</option>`;
+    }
+
+    function handleTableSelectChange() {
+        const el = document.getElementById('tableSelect');
+        const val = el.value;
+        if (val === '__add_new__') {
+            const name = prompt('請輸入新的 Supabase 資料表名稱 (例如: inventory1)');
+            if (name && name.trim()) {
+                const tname = name.trim();
+                if (!TABLE_LIST.includes(tname)) {
+                    TABLE_LIST.push(tname);
+                    localStorage.setItem('warehouse_table_list', JSON.stringify(TABLE_LIST));
+                }
+                switchDataTable(tname);
+            } else {
+                renderTableSelect();
+            }
+            return;
+        }
+        switchDataTable(val);
+    }
+
+    async function switchDataTable(tableName) {
+        const tname = String(tableName || '').trim();
+        if (!tname) return;
+        CURRENT_TABLE = tname;
+        localStorage.setItem('warehouse_current_table', CURRENT_TABLE);
+
+        inventory = [];
+        currentSort = { key: null, dir: 1 };
+        currentPage = 1;
+        selectedSlotFilter = null;
+        activeExpFilter = null;
+        
+        renderTableSelect();
+        renderMarquee();
+        renderZoneSelects();
+        renderFloorSelects();
+        renderVisual();
+        renderTable();
+
+        await fetchData(true);
+    }
+
+    /* === 對接 Supabase 雲端資料庫 API === */
+    async function fetchData(announce) {
+        const myToken = ++FETCH_TOKEN;
+        document.getElementById('loader').style.display = 'flex';
+        let fetchError = null;
+        let fetchedInventory = [];
+
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                const { data, error } = await supabaseClient.from(getTableName()).select('*');
+                if (error) throw error;
+                fetchedInventory = data || [];
+                if (myToken !== FETCH_TOKEN || getTableName() !== CURRENT_TABLE) return;
+                inventory = fetchedInventory;
+                localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+            } catch (err) {
+                fetchError = err;
+                console.error('Supabase 讀取失敗，改從本機讀取:', err.message);
+                if (myToken !== FETCH_TOKEN) return;
+                const cached = localStorage.getItem(getLocalCacheKey());
+                inventory = cached ? JSON.parse(cached) : [];
+            }
+        } else {
+            const cached = localStorage.getItem(getLocalCacheKey());
+            inventory = cached ? JSON.parse(cached) : [];
+        }
+
+        if (myToken !== FETCH_TOKEN) return;
+
+        ensureTableZonesFromInventory();
+
+        document.getElementById('loader').style.display = 'none';
+        renderZoneSelects();
+        renderFloorSelects();
+        renderMarquee();
+        renderVisual();
+        renderTable();
+
+        if (fetchError) {
+            showToast(`⚠️ 雲端讀取「${getTableName()}」失敗，已改用本機快取`);
+        } else if (announce) {
+            showToast(`📂 已切換至資料表: ${getTableName()}（共 ${inventory.length} 筆資料）`);
+        }
+    }
+
+    function ensureTableZonesFromInventory() {
+        if (TABLE_ZONE_SETUP[CURRENT_TABLE] && TABLE_ZONE_SETUP[CURRENT_TABLE].length) return;
+
+        const map = {};
+        inventory.forEach(i => {
+            const zone = String(i.zone || '').trim();
+            if (!zone) return;
+            const floorNum = parseInt(String(i.floor || '').replace(/F/i,''), 10) || 1;
+            const pos = Number(i.pos) || 0;
+            if (!map[zone]) map[zone] = { name: zone, floors: 1, perFloor: 10 };
+            map[zone].floors = Math.max(map[zone].floors, floorNum);
+            map[zone].perFloor = Math.max(map[zone].perFloor, pos, 1);
+        });
+
+        const inferred = Object.values(map);
+        if (inferred.length) {
+            TABLE_ZONE_SETUP[CURRENT_TABLE] = inferred;
+            localStorage.setItem('warehouse_table_zone_setup', JSON.stringify(TABLE_ZONE_SETUP));
+        }
+    }
+
+    /* 處理熟成天數輸入（獨立記錄熟成完成日，不覆蓋有效日期） */
+    function handleAddAgingInput() {
+        const days = parseInt(document.getElementById('addAging').value);
+        if (!isNaN(days) && days >= 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            document.getElementById('addAging').dataset.agingDate = d.toISOString().slice(0, 10);
+        } else {
+            delete document.getElementById('addAging').dataset.agingDate;
+        }
+    }
+
+    function handleEditAgingInput() {
+        const days = parseInt(document.getElementById('editAging').value);
+        if (!isNaN(days) && days >= 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            document.getElementById('editAging').dataset.agingDate = d.toISOString().slice(0, 10);
+        } else {
+            delete document.getElementById('editAging').dataset.agingDate;
+        }
+    }
+
+    async function submitFormAction(action) {
+        if(action === 'add') {
+            const customFields = {};
+            CUSTOM_FIELDS.forEach(f => {
+                const el = document.getElementById('addCF_' + f.key);
+                if (el) customFields[f.key] = el.value.trim();
+            });
+
+            const agingDays = document.getElementById('addAging').value.trim();
+            let agingDate = document.getElementById('addAging').dataset.agingDate;
+            if (agingDays && !agingDate && !isNaN(parseInt(agingDays))) {
+                const d = new Date();
+                d.setDate(d.getDate() + parseInt(agingDays));
+                agingDate = d.toISOString().slice(0, 10);
+            }
+
+            const newItem = {
+                id: 'item_' + Date.now(),
+                zone: document.getElementById('addZone').value,
+                floor: document.getElementById('addFloor').value,
+                pos: Number(document.getElementById('addPos').value),
+                name: document.getElementById('addName').value.trim(),
+                batch: document.getElementById('addBatch').value.trim(),
+                date: document.getElementById('addDate').value,
+                aging: agingDays,
+                agingDate: agingDate || '',
+                createdAt: new Date().toISOString().slice(0, 10),
+                note: document.getElementById('addNote').value.trim(),
+                color: document.getElementById('addColor').value,
+                customFields,
+                logs: []
+            };
+            if(!newItem.pos || !newItem.name) { alert('請填寫儲位號碼與產品名稱'); return; }
+
+            document.getElementById('loader').style.display = 'flex';
+
+            if (supabaseClient && !isOfflineMode) {
+                try {
+                    const { error } = await supabaseClient.from(getTableName()).insert([newItem]);
+                    if (error) throw error;
+                    showToast('☁️ 成功同步上傳至 Supabase！');
+                } catch (err) {
+                    alert(formatSupabaseColumnError(err, ['color', 'logs', 'customFields']));
+                }
+            } else if (isOfflineMode) {
+                showToast('📴 離線模式：已暫存至本機');
+            } else {
+                showToast('💾 已暫存至本機 (未設定 Supabase)');
+            }
+
+            inventory.push(newItem);
+            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+            
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('addAging').value = '';
+            delete document.getElementById('addAging').dataset.agingDate;
+            renderVisual(); 
+            renderTable();
+        }
+    }
+
+    function openItemEditModal(id) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const item = inventory.find(x => String(x.id) === String(id));
+        if (!item) { alert('找不到目前資料表中的這筆資料'); return; }
+
+        document.getElementById('editItemId').value = item.id;
+        const zoneEl = document.getElementById('editZone');
+        zoneEl.innerHTML = getEffectiveZones().map(z =>
+            `<option value="${escapeHtml(z.name)}">${escapeHtml(z.name)}</option>`).join('');
+        zoneEl.value = item.zone || zoneEl.value;
+
+        const floorEl = document.getElementById('editFloor');
+        const zone = getEffectiveZones().find(z => z.name === zoneEl.value) || getEffectiveZones()[0];
+        const floorCount = Math.max(1, Number(zone && zone.floors) || 1);
+        floorEl.innerHTML = Array.from({length: floorCount}, (_, idx) =>
+            `<option value="${idx+1}F">${idx+1}F</option>`).join('');
+        floorEl.value = item.floor || floorEl.value;
+
+        document.getElementById('editPos').value = item.pos ?? '';
+        document.getElementById('editName').value = item.name ?? '';
+        document.getElementById('editBatch').value = item.batch ?? '';
+        document.getElementById('editDate').value = item.date ?? '';
+        document.getElementById('editAging').value = item.aging ?? '';
+        if (item.agingDate) {
+            document.getElementById('editAging').dataset.agingDate = item.agingDate;
+        } else {
+            delete document.getElementById('editAging').dataset.agingDate;
+        }
+        document.getElementById('editNote').value = item.note ?? '';
+        document.getElementById('editColor').value = item.color || '#06b6d4';
+
+        const c = document.getElementById('editCustomFieldsContainer');
+        c.innerHTML = CUSTOM_FIELDS.map(f =>
+            `<input type="text" id="editCF_${f.key}" placeholder="${escapeHtml(f.label)}" class="btn" value="${escapeAttr(item.customFields && item.customFields[f.key] || '')}">`
+        ).join('');
+
+        zoneEl.onchange = function() {
+            const z = getEffectiveZones().find(x => x.name === this.value);
+            const n = Math.max(1, Number(z && z.floors) || 1);
+            const current = floorEl.value;
+            floorEl.innerHTML = Array.from({length:n}, (_, idx) =>
+                `<option value="${idx+1}F">${idx+1}F</option>`).join('');
+            floorEl.value = Array.from({length:n}, (_, idx) => `${idx+1}F`).includes(current) ? current : '1F';
+        };
+
+        document.getElementById('itemEditModal').style.display = 'flex';
+    }
+
+    async function saveItemEdit() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const id = document.getElementById('editItemId').value;
+        const item = inventory.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const newPos = Number(document.getElementById('editPos').value);
+        const newName = document.getElementById('editName').value.trim();
+        if (!newPos || !newName) { alert('請填寫儲位號碼與產品名稱'); return; }
+
+        const customFields = {};
+        CUSTOM_FIELDS.forEach(f => {
+            const el = document.getElementById('editCF_' + f.key);
+            if (el) customFields[f.key] = el.value.trim();
+        });
+
+        const editAgingDays = document.getElementById('editAging').value.trim();
+        let editAgingDate = document.getElementById('editAging').dataset.agingDate;
+        if (editAgingDays && !editAgingDate && !isNaN(parseInt(editAgingDays))) {
+            const d = new Date();
+            d.setDate(d.getDate() + parseInt(editAgingDays));
+            editAgingDate = d.toISOString().slice(0, 10);
+        }
+
+        const updated = {
+            zone: document.getElementById('editZone').value,
+            floor: document.getElementById('editFloor').value,
+            pos: newPos,
+            name: newName,
+            batch: document.getElementById('editBatch').value.trim(),
+            date: document.getElementById('editDate').value,
+            aging: editAgingDays,
+            agingDate: editAgingDate || item.agingDate || '',
+            note: document.getElementById('editNote').value.trim(),
+            color: document.getElementById('editColor').value,
+            customFields
+        };
+
+        document.getElementById('loader').style.display = 'flex';
+        try {
+            if (supabaseClient && !isOfflineMode) {
+                const { error } = await supabaseClient.from(getTableName()).update(updated).eq('id', id);
+                if (error) throw error;
+            }
+            Object.assign(item, updated);
+            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+            closeModal('itemEditModal');
+            renderVisual();
+            renderTable();
+            showToast(supabaseClient && !isOfflineMode ? '☁️ 資料已更新並同步雲端' : '💾 資料已更新');
+        } catch (err) {
+            alert(formatSupabaseColumnError(err, ['color','customFields']));
+        } finally {
+            document.getElementById('loader').style.display = 'none';
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+    function escapeAttr(value) {
+        return escapeHtml(value);
+    }
+
+    async function deleteItem(id) {
+        if(confirm('確定要刪除這筆產品庫存嗎？')) {
+            document.getElementById('loader').style.display = 'flex';
+
+            if (supabaseClient && !isOfflineMode) {
+                try {
+                    const { error } = await supabaseClient.from(getTableName()).delete().eq('id', id);
+                    if (error) throw error;
+                    showToast('🗑️ 雲端資料刪除成功');
+                } catch (err) {
+                    alert('刪除失敗: ' + err.message);
+                }
+            } else if (isOfflineMode) {
+                showToast('📴 離線模式：已刪除本機資料');
+            }
+
+            inventory = inventory.filter(x => x.id !== id);
+            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+            
+            document.getElementById('loader').style.display = 'none';
+            renderVisual(); 
+            renderTable();
+        }
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function showToast(msg) {
+        const t = document.getElementById('syncToast');
+        t.innerText = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function formatSupabaseColumnError(err, possibleColumns) {
+        const msg = err && err.message ? err.message : String(err);
+        if (msg.includes('Could not find') && msg.includes('column')) {
+            const sql = [
+                `alter table "${getTableName()}" add column if not exists color text;`,
+                `alter table "${getTableName()}" add column if not exists logs jsonb default '[]'::jsonb;`,
+                `alter table "${getTableName()}" add column if not exists "customFields" jsonb default '{}'::jsonb;`
+            ].join('\n');
+            return `⚠️ 同步失敗：${msg}\n\n請至 Supabase 專案 SQL Editor 執行以下指令：\n\n${sql}`;
+        }
+        return `⚠️ 同步失敗：${msg}`;
+    }
+
+    function toggleNetworkMode() {
+        isOfflineMode = !isOfflineMode;
+        const btn = document.getElementById('netStatusBtn');
+        btn.style.background = isOfflineMode ? '#64748b' : '#10b981';
+        btn.innerText = isOfflineMode ? "📴 離線模式" : "🌐 線上模式";
+        if (isOfflineMode) {
+            showToast('📴 已切換為離線模式，資料僅存於本機');
+        } else {
+            showToast('🌐 已切換為線上模式，正在與雲端同步...');
+            fetchData();
+        }
+    }
+
+    function openBackendSettings() { startOnboardingWizard(); }
+    function openZoneManageModal() {
+        renderZoneManageList();
+        document.getElementById('zoneManageModal').style.display = 'flex';
+    }
+
+    function renderZoneManageList() {
+        const list = document.getElementById('zoneManageList');
+        const zones = getEffectiveZones();
+        if (!zones.length) {
+            list.innerHTML = `<div style="color:var(--text-dim); font-size:13px;">尚無任何區域設定</div>`;
+            return;
+        }
+        list.innerHTML = zones.map((z, idx) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:12px; border:1px solid var(--border);">
+                <div>
+                    <b>${z.name}</b>
+                    <div style="font-size:12px; color:var(--text-dim);">${z.floors} 樓層 × 每層 ${z.perFloor} 庫位</div>
+                </div>
+                <button class="btn-main" style="background:var(--danger); padding:6px 10px; font-size:12px;" onclick="deleteZoneEntry(${idx})">🗑️ 刪除</button>
+            </div>
+        `).join('');
+    }
+
+    function addZoneEntry() {
+        const name = document.getElementById('zmNewName').value.trim();
+        const floors = parseInt(document.getElementById('zmNewFloors').value) || 1;
+        const perFloor = parseInt(document.getElementById('zmNewPerFloor').value) || 10;
+        if (!name) { alert('請輸入區域名稱'); return; }
+
+        const zones = getEffectiveZones();
+        if (zones.some(z => z.name === name)) { alert('該區域名稱已存在'); return; }
+
+        zones.push({ name, floors, perFloor });
+        ZONE_SETUP = zones;
+        TABLE_ZONE_SETUP[CURRENT_TABLE] = zones;
+        localStorage.setItem('warehouse_zone_setup', JSON.stringify(ZONE_SETUP));
+        localStorage.setItem('warehouse_table_zone_setup', JSON.stringify(TABLE_ZONE_SETUP));
+
+        document.getElementById('zmNewName').value = '';
+        document.getElementById('zmNewFloors').value = '1';
+        document.getElementById('zmNewPerFloor').value = '10';
+
+        renderZoneSelects();
+        renderFloorSelects();
+        renderZoneManageList();
+        renderVisual();
+        showToast('✅ 區域新增成功');
+    }
+
+    function deleteZoneEntry(idx) {
+        const zones = getEffectiveZones();
+        if (zones.length <= 1) { alert('至少需保留一個區域'); return; }
+        if (!confirm(`確定要刪除區域「${zones[idx].name}」嗎？`)) return;
+
+        zones.splice(idx, 1);
+        ZONE_SETUP = zones;
+        TABLE_ZONE_SETUP[CURRENT_TABLE] = zones;
+        localStorage.setItem('warehouse_zone_setup', JSON.stringify(ZONE_SETUP));
+        localStorage.setItem('warehouse_table_zone_setup', JSON.stringify(TABLE_ZONE_SETUP));
+
+        renderZoneSelects();
+        renderFloorSelects();
+        renderZoneManageList();
+        renderVisual();
+        showToast('🗑️ 區域已刪除');
+    }
+</script>
+</body>
+</html>
