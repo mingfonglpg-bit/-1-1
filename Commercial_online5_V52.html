@@ -216,7 +216,7 @@
         <!-- 登入表單 -->
         <div id="formLogin">
             <div class="auth-form-group">
-                <label>電子郵件（與 reg1.html 共用帳號）</label>
+                <label>電子郵件</label>
                 <input type="email" id="loginUser" class="auth-input" placeholder="請輸入電子郵件">
             </div>
             <div class="auth-form-group">
@@ -233,7 +233,7 @@
         <!-- 註冊表單 -->
         <div id="formReg" style="display:none;">
             <div class="auth-form-group">
-                <label>電子郵件（此帳號可與 reg1.html 共用）</label>
+                <label>電子郵件</label>
                 <input type="email" id="regUser" class="auth-input" placeholder="請輸入電子郵件">
             </div>
             <div class="auth-form-group">
@@ -388,7 +388,7 @@
         <div style="margin-top:20px; padding-top:15px; border-top:1px dashed var(--border);">
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
                 <span style="font-size:13px; font-weight:bold; color:var(--text-dim);">⚡ 快速全庫搜索：</span>
-                <button class="btn-filter" id="filter15" onclick="setExpFilter(1, 15)">🚨 熟成倒數 (1-15日)</button>
+                <button class="btn-filter" id="filter15" onclick="setExpFilter(1, 15)">🚨 即期 (1-15日)</button>
                 <button class="btn-filter" id="filter30" onclick="setExpFilter(16, 30)">⚠️ 30日 (16-30日)</button>
                 <button class="btn-filter" id="filter60" onclick="setExpFilter(31, 60)">📢 60日 (31-60日)</button>
                 <button class="btn-filter" id="filterAll" onclick="clearAllFilters()" style="background:#334155; color:white;">🔄 重置 / 全庫</button>
@@ -408,7 +408,7 @@
                     <option value="zone">儲位</option>
                     <option value="name">產品名稱</option>
                     <option value="date">有效日期</option>
-                    <option value="aging">熟成時間 / 倒數</option>
+                    <option value="aging">熟成時間</option>
                     <option value="batch">批號</option>
                 </select>
                 <button id="mobileSortDirBtn" class="btn-main" style="background:#475569; white-space:nowrap;" onclick="toggleMobileSortDir()">⬆️ 由小到大</button>
@@ -424,7 +424,7 @@
                     <th onclick="sortTable('zone')" style="cursor:pointer; user-select:none;">儲位 <span id="sortIcon-zone"></span></th>
                     <th onclick="sortTable('name')" style="cursor:pointer; user-select:none;">產品名稱 <span id="sortIcon-name"></span></th>
                     <th onclick="sortTable('date')" style="cursor:pointer; user-select:none;">有效日期 <span id="sortIcon-date"></span></th>
-                    <th onclick="sortTable('aging')" style="cursor:pointer; user-select:none;">熟成時間 / 倒數 <span id="sortIcon-aging"></span></th>
+                    <th onclick="sortTable('aging')" style="cursor:pointer; user-select:none;">熟成時間<span id="sortIcon-aging"></span></th>
                     <th onclick="sortTable('batch')" style="cursor:pointer; user-select:none;">批號 <span id="sortIcon-batch"></span></th>
                     <th id="noteHeader">備註與狀態</th>
                     <th>回報 / 補貨</th>
@@ -903,9 +903,9 @@
             }
 
             if (data.session) {
-                alert('註冊成功！此帳號已可與 reg1.html 共用登入。');
+                alert('註冊成功！此帳號已可登入。');
             } else {
-                alert('註冊成功！若 Supabase 專案有開啟信箱驗證，請至信箱完成驗證後再登入（此帳號可與 reg1.html 共用）。');
+                alert('註冊成功！若 Supabase 專案有開啟信箱驗證，請至信箱完成驗證後再登入。');
             }
             switchAuthTab('login');
         } catch (err) {
