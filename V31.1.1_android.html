@@ -307,7 +307,7 @@
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
                 <button id="colorModeBtn" onclick="toggleColorPickMode()" class="btn-main" style="display:none; background:#334155; padding:8px 12px; font-size:12px;">🎨 自訂顏色模式</button>
-                <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成室-左">乾式熟成室-左</option><option value="乾式熟成室-右">乾式熟成室-右</option></select>
+                <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成-左">乾式熟成-左</option><option value="乾式熟成-右">乾式熟成-右</option></select>
                 <select id="vFloor" onchange="renderVisual()" class="btn" style="width:75px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
         </div>
@@ -836,7 +836,7 @@
                     if(e.target.result) {
                         inventory = e.target.result.value.inventory; zoneConfigs = e.target.result.value.configs || {};
                         // [檢查][重複] 同上，這裡又寫了一次一樣的區域儲位規格設定
-                        zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
+                        zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 }; zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 }; zoneConfigs["乾式熟成-左"] = { maxPos: 10, cols: 5 }; zoneConfigs["乾式熟成-右"] = { maxPos: 10, cols: 5 };
                         try { await reapplyPendingQueueLocally(); } catch(err) { console.warn('重新套用佇列失敗:', err); }
                         autoCheckExpiredDaily(); renderAll();
                     } else alert("本機無快取，請在連線時載入一次。");
