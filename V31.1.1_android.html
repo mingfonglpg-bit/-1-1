@@ -664,7 +664,7 @@
         // [檢查] 下面這行在「從未有過更新紀錄」時，會顯示固定字串
         // "目前暫無變更紀錄2026/06/15"，這串日期是寫死的文字，並非即時抓取的
         // 當下日期，看起來像是先前測試/除錯時留下的殘留內容，容易誤導使用者。
-        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄2026/06/15";
+        let displayStr = savedUpdateTime ? `最後更新：${savedUpdateTime}` : "目前暫無變更紀錄";
         let adminDisplayStr = savedUpdateTime ? `最後更新時間：${savedUpdateTime}:${savedUpdateSeconds}` : "目前暫無變更紀錄";
 
         // 管理員與一般使用者看到不同的跑馬燈公告內容
@@ -815,6 +815,7 @@
             // 這裡先保留原始寫法，避免更動運作邏輯。
             zoneConfigs["極冷庫-左"] = { maxPos: 22, cols: 11 }; zoneConfigs["極冷庫-右"] = zoneConfigs["極冷庫-右"] || { maxPos: 22, cols: 11 };
             zoneConfigs["冷藏庫-左"] = { maxPos: 17, cols: 9 }; zoneConfigs["冷藏庫-右"] = { maxPos: 14, cols: 7 };
+            zoneConfigs["乾式熟成-左"] = { maxPos: 10, cols: 5 }; zoneConfigs["乾式熟成-右"] = { maxPos: 10, cols: 5 };
             zoneConfigs["常溫區"] = { maxPos: 5, cols: 5 };
             if(db) db.transaction("cache", "readwrite").objectStore("cache").put({ key: "inventoryData", value: data });
             await reapplyPendingQueueLocally();
