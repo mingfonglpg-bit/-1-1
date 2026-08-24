@@ -200,8 +200,8 @@
         <!-- 登入表單 -->
         <div id="formLogin">
             <div class="auth-form-group">
-                <label>帳號 / 電子郵件</label>
-                <input type="text" id="loginUser" class="auth-input" placeholder="請輸入帳號">
+                <label>電子郵件（與 reg1.html 共用帳號）</label>
+                <input type="email" id="loginUser" class="auth-input" placeholder="請輸入電子郵件">
             </div>
             <div class="auth-form-group">
                 <label>密碼</label>
@@ -217,8 +217,8 @@
         <!-- 註冊表單 -->
         <div id="formReg" style="display:none;">
             <div class="auth-form-group">
-                <label>設定使用者帳號</label>
-                <input type="text" id="regUser" class="auth-input" placeholder="建議使用英文或 Email">
+                <label>電子郵件（此帳號可與 reg1.html 共用）</label>
+                <input type="email" id="regUser" class="auth-input" placeholder="請輸入電子郵件">
             </div>
             <div class="auth-form-group">
                 <label>設定密碼</label>
@@ -585,18 +585,35 @@
         }
     }
 
-    window.onload = function() {
+    window.onload = async function() {
         if (!WAREHOUSE_SETUP) {
             startOnboardingWizard();
-        } else {
-            applyBrandSettings();
-            initSupabase();
-            if (currentUser) {
-                initApp();
-            } else {
-                document.getElementById('authModal').style.display = 'flex';
-            }
+            return;
         }
+        applyBrandSettings();
+        initSupabase();
+
+        if (currentUser) {
+            initApp();
+            return;
+        }
+
+        /* 因與 reg1.html 同網域，若瀏覽器已有登入中的共用 Supabase Auth session，直接沿用免重複登入 */
+        try {
+            initAuthClient();
+            const { data } = await authClient.auth.getSession();
+            if (data && data.session && data.session.user) {
+                const role = (data.session.user.user_metadata && data.session.user.user_metadata.role) || 'operator';
+                currentUser = { username: data.session.user.email, role };
+                sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
+                initApp();
+                return;
+            }
+        } catch (e) {
+            console.warn('偵測既有 Supabase Auth session 失敗：', e);
+        }
+
+        document.getElementById('authModal').style.display = 'flex';
     };
 
     function applyBrandSettings() {
@@ -614,106 +631,41 @@
         document.getElementById('formReg').style.display = type === 'reg' ? 'block' : 'none';
     }
 
-    /* ============ 密碼雜湊工具（SHA-256 + 隨機鹽，跨裝置雲端帳號用） ============ */
-    function genSalt() {
-        const arr = new Uint8Array(16);
-        crypto.getRandomValues(arr);
-        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    async function hashPassword(password, salt) {
-        const data = new TextEncoder().encode(salt + ':' + password);
-        const digest = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    function getUsersTableName() { return 'warehouse_users'; }
+    /* ============ 共用帳號系統：與 reg1.html 使用同一個 Supabase Auth 專案 ============
+       這裡的帳號是真正的 Supabase Auth（GoTrue）帳號，密碼由 Supabase 安全雜湊保存，
+       只要輸入相同的電子郵件／密碼，不論在 reg1.html 或本系統，任何裝置都能登入同一組帳號。 */
+    const SHARED_AUTH_URL = 'https://hyxpkalruglpeuftwmhz.supabase.co/';
+    const SHARED_AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eHBrYWxydWdscGV1ZnR3bWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczODY3MDQsImV4cCI6MjEwMjk2MjcwNH0.LbV5Arfmebs9sRFTuBM8l2XvaerkJ-wIkNETsG6p2EI';
+    let authClient = null;
 
-    function formatUsersTableError(err) {
-        const msg = err && err.message ? err.message : String(err);
-        if (msg.includes('Could not find the table') || msg.includes('does not exist') || msg.includes('schema cache')) {
-            const sql = [
-                `create table if not exists ${getUsersTableName()} (`,
-                `  id bigint generated always as identity primary key,`,
-                `  username text unique not null,`,
-                `  salt text not null,`,
-                `  pass_hash text not null,`,
-                `  role text not null default 'operator',`,
-                `  created_at timestamptz default now()`,
-                `);`,
-                `alter table ${getUsersTableName()} enable row level security;`,
-                `create policy "allow all" on ${getUsersTableName()} for all using (true) with check (true);`
-            ].join('\n');
-            return `⚠️ 雲端帳號資料表尚未建立：${msg}\n\n請至 Supabase 專案 SQL Editor 執行以下指令後再試一次：\n\n${sql}`;
+    function initAuthClient() {
+        if (!authClient) {
+            const { createClient } = supabase;
+            authClient = createClient(SHARED_AUTH_URL, SHARED_AUTH_KEY);
         }
-        return `⚠️ 雲端帳號作業失敗：${msg}`;
+        return authClient;
     }
 
     async function handleLogin() {
         const u = document.getElementById('loginUser').value.trim();
         const p = document.getElementById('loginPass').value.trim();
-        if (!u || !p) { alert('請輸入帳號與密碼'); return; }
+        if (!u || !p) { alert('請輸入電子郵件與密碼'); return; }
 
-        /* 雲端帳號模式：已連接 Supabase 且非離線 → 帳號可跨裝置共用 */
-        if (supabaseClient && !isOfflineMode) {
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const { data, error } = await supabaseClient
-                    .from(getUsersTableName())
-                    .select('*')
-                    .eq('username', u)
-                    .maybeSingle();
-                document.getElementById('loader').style.display = 'none';
+        initAuthClient();
+        document.getElementById('loader').style.display = 'flex';
+        try {
+            const { data, error } = await authClient.auth.signInWithPassword({ email: u, password: p });
+            document.getElementById('loader').style.display = 'none';
+            if (error) { alert('登入失敗：' + error.message); return; }
 
-                if (error) { alert(formatUsersTableError(error)); return; }
-
-                if (!data) {
-                    /* 尚未有任何雲端帳號時，允許用預設管理者帳密首次建立雲端管理員 */
-                    const { count } = await supabaseClient.from(getUsersTableName()).select('*', { count: 'exact', head: true });
-                    if ((!count || count === 0) && u === 'admin' && p === 'admin123') {
-                        const salt = genSalt();
-                        const passHash = await hashPassword(p, salt);
-                        const { error: insErr } = await supabaseClient.from(getUsersTableName()).insert([{ username: 'admin', salt, pass_hash: passHash, role: 'admin' }]);
-                        if (insErr) { alert(formatUsersTableError(insErr)); return; }
-                        currentUser = { username: 'admin', role: 'admin' };
-                        sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
-                        document.getElementById('authModal').style.display = 'none';
-                        initApp();
-                        return;
-                    }
-                    alert('帳號或密碼錯誤！');
-                    return;
-                }
-
-                const passHash = await hashPassword(p, data.salt);
-                if (passHash === data.pass_hash) {
-                    currentUser = { username: data.username, role: data.role };
-                    sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
-                    document.getElementById('authModal').style.display = 'none';
-                    initApp();
-                } else {
-                    alert('帳號或密碼錯誤！');
-                }
-            } catch (err) {
-                document.getElementById('loader').style.display = 'none';
-                alert('登入時發生錯誤：' + err.message);
-            }
-            return;
-        }
-
-        /* 離線模式：帳號僅存於本機瀏覽器，不會跨裝置同步 */
-        let users = JSON.parse(localStorage.getItem('warehouse_users_db') || '[]');
-        if (users.length === 0 && u === 'admin' && p === 'admin123') {
-            users.push({ username: 'admin', pass: 'admin123', role: 'admin' });
-            localStorage.setItem('warehouse_users_db', JSON.stringify(users));
-        }
-
-        const found = users.find(x => x.username === u && x.pass === p);
-        if (found) {
-            currentUser = found;
+            const role = (data.user.user_metadata && data.user.user_metadata.role) || 'operator';
+            currentUser = { username: data.user.email, role };
             sessionStorage.setItem('warehouse_user', JSON.stringify(currentUser));
             document.getElementById('authModal').style.display = 'none';
             initApp();
-        } else {
-            alert('帳號或密碼錯誤！(預設管理者: admin / admin123，離線模式帳號僅存於本機)');
+        } catch (err) {
+            document.getElementById('loader').style.display = 'none';
+            alert('登入時發生錯誤：' + err.message);
         }
     }
 
@@ -721,47 +673,38 @@
         const u = document.getElementById('regUser').value.trim();
         const p = document.getElementById('regPass').value.trim();
         const r = document.getElementById('regRole').value;
-        if (!u || !p) { alert('請填寫完整註冊資訊'); return; }
+        if (!u || !p) { alert('請填寫完整註冊資訊（電子郵件與密碼）'); return; }
 
-        /* 雲端帳號模式：寫入 Supabase，所有裝置都能用同一組帳密登入 */
-        if (supabaseClient && !isOfflineMode) {
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const { data: existing, error: checkErr } = await supabaseClient
-                    .from(getUsersTableName())
-                    .select('username')
-                    .eq('username', u)
-                    .maybeSingle();
-                if (checkErr) { document.getElementById('loader').style.display = 'none'; alert(formatUsersTableError(checkErr)); return; }
-                if (existing) { document.getElementById('loader').style.display = 'none'; alert('該帳號已被註冊'); return; }
+        initAuthClient();
+        document.getElementById('loader').style.display = 'flex';
+        try {
+            const { data, error } = await authClient.auth.signUp({
+                email: u,
+                password: p,
+                options: { data: { role: r } }
+            });
+            document.getElementById('loader').style.display = 'none';
+            if (error) { alert('註冊失敗：' + error.message); return; }
 
-                const salt = genSalt();
-                const passHash = await hashPassword(p, salt);
-                const { error } = await supabaseClient.from(getUsersTableName()).insert([{ username: u, salt, pass_hash: passHash, role: r }]);
-                document.getElementById('loader').style.display = 'none';
-                if (error) { alert(formatUsersTableError(error)); return; }
-
-                alert('雲端帳號註冊成功！所有裝置皆可用此帳密登入。');
-                switchAuthTab('login');
-            } catch (err) {
-                document.getElementById('loader').style.display = 'none';
-                alert('註冊時發生錯誤：' + err.message);
+            if (data.session) {
+                alert('註冊成功！此帳號已可與 reg1.html 共用登入。');
+            } else {
+                alert('註冊成功！若 Supabase 專案有開啟信箱驗證，請至信箱完成驗證後再登入（此帳號可與 reg1.html 共用）。');
             }
-            return;
+            switchAuthTab('login');
+        } catch (err) {
+            document.getElementById('loader').style.display = 'none';
+            alert('註冊時發生錯誤：' + err.message);
         }
-
-        /* 離線模式：僅存於本機，不會跨裝置同步 */
-        let users = JSON.parse(localStorage.getItem('warehouse_users_db') || '[]');
-        if (users.some(x => x.username === u)) { alert('該帳號已被註冊'); return; }
-
-        users.push({ username: u, pass: p, role: r });
-        localStorage.setItem('warehouse_users_db', JSON.stringify(users));
-        alert('註冊成功！（目前為離線模式，此帳號僅存於本機瀏覽器，換裝置需重新註冊）');
-        switchAuthTab('login');
     }
 
-    function handleLogout() {
+    async function handleLogout() {
         sessionStorage.removeItem('warehouse_user');
+        try {
+            if (authClient) await authClient.auth.signOut();
+        } catch (e) {
+            console.warn('登出 Supabase Auth session 時發生錯誤：', e);
+        }
         location.reload();
     }
 
