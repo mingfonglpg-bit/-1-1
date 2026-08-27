@@ -249,7 +249,7 @@
             <div class="auth-form-group">
                 <label>權限類別</label>
                 <select id="regRole" class="auth-input" style="background:var(--select-bg)">
-                    <option value="operator">現場操作員 (可查詢、回報)</option>
+                    <option value="operator">現場操作員 (可查詢、回報、新增入庫)</option>
                     <option value="admin">系統管理員 (全權限)</option>
                 </select>
                 <div id="adminSetupStatus" style="margin-top:8px; padding:9px 10px; border-radius:10px; font-size:12px; background:rgba(6,182,212,.10); border:1px solid rgba(6,182,212,.25); color:var(--text-dim);">
@@ -345,7 +345,7 @@
         <button id="marqueeEditBtn" class="btn-main marquee-edit-btn admin-edit-btn" style="display:none;" onclick="openMarqueeEditModal()">✏️ 編輯字卡</button>
     </div>
 
-    <!-- 管理員新增入庫面板 -->
+    <!-- 新增入庫面板（已開放給一般使用者/現場操作員與管理員皆可使用） -->
     <div id="admin-panel" style="display:none; background:rgba(6,182,212,0.05); padding:20px; border-radius:24px; border:1px solid var(--primary); margin-bottom:25px;">
         <h4 style="margin-top:0; color:var(--primary); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <span>➕ 產品新增入庫建檔</span>
@@ -886,16 +886,7 @@
         }
     }
 
-    /* ============ 管理員唯一性檢查（前台輔助提示） ============
-       這裡只是「前台」的體驗優化：若偵測到雲端已有一位管理員，就先在下拉選單把
-       「系統管理員」選項鎖起來，讓使用者不用送出才知道不能選。
-       ⚠️ 這不是真正安全的防護——任何人打開瀏覽器開發者工具都能繞過前端檢查。
-       真正能擋住「已有管理員就禁止再註冊」的防護，必須設在後台（Supabase 資料庫），
-       用資料庫觸發器在帳號寫入當下擋下第二個 admin 註冊。作法請見隨附的
-       supabase_single_admin_setup.sql（貼到 Supabase SQL Editor 執行一次即可）。
-       若尚未在後台建立 system_meta 資料表，這裡的查詢會直接失敗並略過，
-       不會影響一般註冊流程。 */
-    /* ============ V53 客戶獨立 Supabase + Auth + 第一管理員自助開通 ============ */
+    /* ============ 管理員唯一性檢查（前台輔助提示） ============ */
     function setAdminSetupStatus(text, tone) {
         const el = document.getElementById('adminSetupStatus');
         if (!el) return;
@@ -955,7 +946,6 @@
         }
         setAdminSetupStatus('🔎 正在檢查第一位管理員狀態…', 'info');
 
-        // 最多等 5 秒；RPC 不存在、RLS 或網路異常都不能讓啟動卡住。
         try {
             const state = await Promise.race([
                 getCloudAdminState(),
@@ -979,11 +969,8 @@
         }
     }
 
-    /* ============ V53 客戶獨立 Supabase Auth ============
-       登入、註冊、角色與倉庫資料全部使用設定精靈輸入的同一個 Supabase 專案。
-       不再內嵌任何平台共用 Auth URL / Key。 */
+    /* ============ V53 客戶獨立 Supabase Auth ============ */
     let authClient = null;
-    // 第一位管理員模式：優先使用本機旗標，雲端狀態查詢失敗時仍可正常進入註冊/登入流程。
     let FIRST_ADMIN_MODE = localStorage.getItem('warehouse_admin_initialized') !== '1';
 
     function initAuthClient() {
@@ -1163,7 +1150,6 @@
                 supabaseKey: supaKey
             };
 
-            // 重新設定時不能沿用舊的 Supabase client。
             supabaseClient = null;
             authClient = null;
             localStorage.setItem('warehouse_setup_config', JSON.stringify(WAREHOUSE_SETUP));
@@ -1176,7 +1162,6 @@
             closeModal('wizardModal');
             applyBrandSettings();
             document.getElementById('authModal').style.display = 'flex';
-            // 管理員狀態是輔助檢查，不得阻塞「啟動系統」。
             refreshAdminRegistrationLock().catch(e => console.warn('管理員狀態檢查略過：', e));
         } catch (e) {
             console.error('完成建檔設定失敗：', e);
@@ -1190,7 +1175,8 @@
         document.getElementById('main-container').style.display = 'block';
         const roleLabel = currentUser.role === 'admin' ? '管理員' : (currentUser.role === 'guest' ? '訪客・僅檢視' : '操作員');
         document.getElementById('userBadge').innerText = `👤 ${currentUser.username} (${roleLabel})`;
-        document.getElementById('admin-panel').style.display = currentUser.role === 'admin' ? 'block' : 'none';
+        // 開放新增入庫面板給操作員與管理員 (非訪客即可看到新增入庫)
+        document.getElementById('admin-panel').style.display = currentUser.role !== 'guest' ? 'block' : 'none';
         document.getElementById('zoneManageBtn').style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
         document.getElementById('marqueeEditBtn').style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
         document.getElementById('backendSettingsBtn').style.display = currentUser.role === 'guest' ? 'none' : 'inline-flex';
@@ -1329,8 +1315,6 @@
             return;
         }
 
-        // 從視覺庫位進入資料時，優先讓使用者看到「這個庫位」的完整資料，
-        // 避免先前的搜尋/到期篩選把該庫位資料誤藏起來。
         selectedSlotFilter = next;
         activeExpFilter = null;
         searchQuery = '';
@@ -1350,7 +1334,6 @@
         }
     }
 
-    // 精準捲動到下方資料區，兼顧手機/平板與瀏覽器固定工具列造成的偏移。
     function scrollToInventoryTable() {
         const target = document.querySelector('.inventory-table-wrap');
         if (!target) return;
@@ -1363,12 +1346,10 @@
         target.classList.add('slot-focus-pulse');
     }
 
-    // 點一次就完成「選取 → 顯示筆數 → 捲到資料」，不再要求使用者雙擊。
     function handleSlotTap(zone, floor, pos) {
         selectSlotFilter(zone, floor, pos, { force: true, scroll: true });
     }
 
-    /* 渲染視覺化地圖（同步顯示熟成倒數） */
     function normalizeVisualFloor(value) {
         const s = String(value == null ? '' : value).trim().toUpperCase();
         const m = s.match(/(\d+)/);
@@ -1406,7 +1387,7 @@
             const isSelected = selectedSlotFilter && selectedSlotFilter.zone === zName && selectedSlotFilter.floor === floor && Number(selectedSlotFilter.pos) === i;
             slot.className = 'slot' + (items.length ? ' occupied' : '') + (isSelected ? ' active-slot' : '');
             
-            slot.style.touchAction = 'manipulation'; // 避免行動裝置把快速點兩下判定為縮放手勢，蓋掉雙擊事件
+            slot.style.touchAction = 'manipulation';
             slot.onclick = function() {
                 handleSlotTap(zName, floor, i);
             };
@@ -1518,7 +1499,7 @@
         renderTable();
     }
 
-    /* ============ 核心修復：針對「熟成時間 / 熟成到期日」進行倒數計算 ============ */
+    /* 熟成時間計算 */
     function getAgingDaysLeft(item) {
         let targetDateStr = item.agingDate;
         if (!targetDateStr && item.aging) {
@@ -1566,8 +1547,6 @@
         let result = [...inventory];
 
         if (selectedSlotFilter) {
-            // 視覺庫位與資料表的樓層格式可能不同（例如 1 / 1F），
-            // 必須使用同一套庫位比對規則，否則摘要會顯示有資料，但表格卻變成 0 筆。
             result = result.filter(i => isSameSlot(i, selectedSlotFilter));
         }
 
@@ -1654,8 +1633,6 @@
         renderTable();
     }
 
-    // 手機/平板排序工具列：下拉選單選欄位 + 按鈕切換方向，
-    // 底層共用同一個 currentSort 狀態，跟桌機版表頭點擊排序完全同步
     function applyMobileSort() {
         const key = document.getElementById('mobileSortKey').value;
         currentSort.key = key || null;
@@ -1664,7 +1641,7 @@
     }
 
     function toggleMobileSortDir() {
-        if (!currentSort.key) return; // 尚未選擇排序欄位時，方向鈕不動作
+        if (!currentSort.key) return;
         currentSort.dir *= -1;
         renderTable();
     }
@@ -1678,181 +1655,430 @@
 
     function updateSortIcons() {
         ['zone', 'name', 'date', 'aging', 'batch'].forEach(k => {
-            const el = document.getElementById('sortIcon-' + k);
-            if (!el) return;
-            el.innerText = currentSort.key === k ? (currentSort.dir === 1 ? '▲' : '▼') : '';
+            const iconEl = document.getElementById(`sortIcon-${k}`);
+            if (iconEl) {
+                if (currentSort.key === k) {
+                    iconEl.innerText = currentSort.dir === 1 ? '▲' : '▼';
+                } else {
+                    iconEl.innerText = '';
+                }
+            }
         });
         syncMobileSortBar();
     }
 
+    /* 渲染表格 UI */
     function renderTable() {
         const tbody = document.getElementById('tableBody');
-        const filteredList = getFilteredInventory();
+        tbody.innerHTML = '';
         updateSortIcons();
 
-        const totalItems = filteredList.length;
+        const filtered = getFilteredInventory();
+        const totalItems = filtered.length;
         const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
         if (currentPage > totalPages) currentPage = totalPages;
         if (currentPage < 1) currentPage = 1;
 
-        const startIndex = (currentPage - 1) * pageSize;
-        const pageData = filteredList.slice(startIndex, startIndex + pageSize);
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, totalItems);
+        const pageData = filtered.slice(startIdx, endIdx);
 
-        document.getElementById('pageInfo').innerText = totalItems > 0 
-            ? `顯示第 ${startIndex + 1} - ${Math.min(startIndex + pageSize, totalItems)} 筆，共 ${totalItems} 筆`
-            : `顯示第 0 - 0 筆，共 0 筆`;
+        document.getElementById('pageInfo').innerText = `顯示第 ${totalItems ? startIdx + 1 : 0} - ${endIdx} 筆，共 ${totalItems} 筆`;
         document.getElementById('pageNumberDisplay').innerText = `${currentPage} / ${totalPages}`;
-        updateSlotFilterSummary();
 
-        const colSpan = 8 + CUSTOM_FIELDS.length;
-        if (pageData.length === 0) {
-            const emptyText = selectedSlotFilter
-                ? `目前庫位「${selectedSlotFilter.zone} · ${selectedSlotFilter.floor}-${selectedSlotFilter.pos}」沒有庫存資料。`
-                : '目前無符合條件的庫存資料。';
-            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center; padding:30px; color:var(--text-dim);">${emptyText}</td></tr>`;
+        if (!pageData.length) {
+            tbody.innerHTML = `<tr><td colspan="${7 + CUSTOM_FIELDS.length}" style="text-align:center; padding:30px; color:var(--text-dim);">無相符庫存資料</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = pageData.map(i => `
-            <tr>
-                <td data-label="儲位位置">
-                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${i.color || 'var(--primary)'}; margin-right:6px;"></span>
-                    <b>${i.zone ?? '-'} ${i.floor ?? '-'}-${i.pos ?? '-'}</b>
-                </td>
-                <td data-label="產品名稱">${i.name ?? '-'}</td>
-                <td data-label="有效日期">${i.date || '-'}</td>
-                <td data-label="熟成倒數">${getAgingCountdownText(i)}</td>
-                <td data-label="批號"><code>${i.batch || '-'}</code></td>
-                ${renderCustomFieldCells(i)}
-                <td data-label="備註與狀態">
-                    <div class="cell-value-group" style="align-items:flex-end;">
-                        <div>${i.note || '-'}</div>
-                        ${i.statusText ? `<div class="status-tag">📍 ${i.statusText}</div>` : ''}
-                        ${currentUser.role === 'admin' ? `
-                            <div style="display:flex; gap:6px;">
-                                <button class="btn-main admin-edit-btn" style="padding:2px 6px; font-size:10px;" onclick="openNoteStatusEditModal('${i.id}')">✏️ 編輯</button>
-                                <button class="btn-main" style="background:var(--danger); padding:2px 6px; font-size:10px;" onclick="deleteNoteAndStatus('${i.id}')">🗑️ 刪除</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                </td>
-                <td data-label="回報/補貨">
-                    <div class="cell-value-group" style="align-items:flex-end;">
-                        ${currentUser.role !== 'guest' ? `
-                            <div style="display:flex; gap:6px;">
-                                <button class="btn-main" style="background:#f59e0b; padding:4px 8px; font-size:11px;" onclick="openLogModal('${i.id}','report')">📢 回報</button>
-                                <button class="btn-main" style="background:#0ea5e9; padding:4px 8px; font-size:11px;" onclick="executeDirectRestock('${i.id}')">📦 補貨</button>
-                            </div>
-                        ` : '-'}
-                        ${(i.logs && i.logs.length) ? `<a href="#" style="font-size:11px; color:var(--text-dim);" onclick="viewLogHistory('${i.id}'); return false;">📋 紀錄 (${i.logs.length})</a>` : ''}
-                    </div>
-                </td>
-                <td data-label="操作">
-                    ${currentUser.role === 'admin' ? `
-                        <div class="cell-value-group" style="flex-direction:row; gap:6px;">
-                            <button class="btn-main admin-edit-btn" style="padding:4px 8px;font-size:12px;" onclick="openItemEditModal('${i.id}')">✏️ 編輯</button>
-                            <button class="btn-main" style="background:var(--danger);padding:4px 8px;font-size:12px;" onclick="deleteItem('${i.id}')">🗑️ 刪除</button>
-                        </div>
-                    ` : (currentUser.role === 'operator' ? `
-                        <div class="cell-value-group" style="flex-direction:row; gap:6px;">
-                            <button class="btn-main" style="background:var(--primary);padding:4px 8px;font-size:12px;" onclick="openApplyModal('${i.id}', 'edit')">📝 編輯申請</button>
-                        </div>
-                    ` : '-')}
-                </td>
-            </tr>
-        `).join('');
+        pageData.forEach(item => {
+            const tr = document.createElement('tr');
+            
+            let statusTagHtml = '';
+            if (item.statusText) {
+                statusTagHtml = `<div class="status-tag">📍 ${item.statusText}</div>`;
+            }
+
+            let customFieldsHtml = '';
+            CUSTOM_FIELDS.forEach(f => {
+                const val = item.customFields?.[f.key] || '-';
+                customFieldsHtml += `<td data-label="${f.label}">${val}</td>`;
+            });
+
+            const agingText = getAgingCountdownText(item);
+
+            let actionBtns = '';
+            if (currentUser && currentUser.role !== 'guest') {
+                actionBtns += `<button class="btn-main" style="padding:4px 8px; font-size:11px; background:#f59e0b;" onclick="openLogModal('${item.id}', 'report')">📣 回報</button>`;
+                actionBtns += `<button class="btn-main" style="padding:4px 8px; font-size:11px; background:#06b6d4;" onclick="openLogModal('${item.id}', 'restock')">📦 補貨</button>`;
+            }
+            if (item.logs && item.logs.length) {
+                actionBtns += `<br><a href="#" style="font-size:11px; color:#38bdf8; margin-top:4px; display:inline-block;" onclick="openLogHistoryModal('${item.id}')">📋 紀錄(${item.logs.length})</a>`;
+            }
+
+            let adminBtns = '';
+            if (currentUser && currentUser.role === 'admin') {
+                adminBtns += `<button class="btn-main admin-edit-btn" style="padding:4px 8px; font-size:11px;" onclick="openItemEditModal('${item.id}')">✏️ 編輯</button>`;
+                adminBtns += `<button class="btn-main" style="padding:4px 8px; font-size:11px; background:var(--danger); margin-left:4px;" onclick="deleteItem('${item.id}')">🗑️ 刪除</button>`;
+            } else {
+                adminBtns = '<span style="font-size:12px; color:var(--text-dim);">-</span>';
+            }
+
+            let noteContentHtml = item.note || '-';
+            if (currentUser && currentUser.role === 'admin') {
+                noteContentHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                        <span>${item.note || '<i style="color:var(--text-dim);">(無備註)</i>'}</span>
+                        ${statusTagHtml}
+                        <button class="btn-main admin-edit-btn" style="padding:2px 6px; font-size:10px; margin-top:2px;" onclick="openNoteStatusEditModal('${item.id}')">✏️ 編輯備註/狀態</button>
+                    </div>`;
+            } else {
+                noteContentHtml = `<div>${item.note || '-'}${statusTagHtml}</div>`;
+            }
+
+            tr.innerHTML = `
+                <td data-label="儲位"><b style="color:${item.color || 'var(--primary)'};">🔵 ${item.zone} ${item.floor}-${item.pos}</b></td>
+                <td data-label="產品名稱"><b>${item.name}</b></td>
+                <td data-label="有效日期">${item.date || '-'}</td>
+                <td data-label="熟成時間">${agingText}</td>
+                <td data-label="批號">${item.batch || '-'}</td>
+                ${customFieldsHtml}
+                <td data-label="備註與狀態">${noteContentHtml}</td>
+                <td data-label="回報 / 補貨"><div class="cell-value-group">${actionBtns}</div></td>
+                <td data-label="操作"><div class="cell-value-group">${adminBtns}</div></td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
 
+    /* 分頁控制功能 */
     function changePage(delta) {
-        const filteredList = getFilteredInventory();
-        const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
         currentPage += delta;
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages) currentPage = totalPages;
         renderTable();
     }
 
     function goToPage(target) {
-        const filteredList = getFilteredInventory();
-        const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
+        const filtered = getFilteredInventory();
+        const totalPages = Math.ceil(filtered.length / pageSize) || 1;
         if (target === 'last') currentPage = totalPages;
-        else currentPage = Number(target) || 1;
+        else currentPage = parseInt(target, 10) || 1;
         renderTable();
     }
 
-    function renderCustomFieldCells(item) {
-        if (!CUSTOM_FIELDS.length) return '';
-        return CUSTOM_FIELDS.map(f => {
-            const val = (item.customFields && item.customFields[f.key]) ? item.customFields[f.key] : '-';
-            return `<td data-label="${f.label}">${val}</td>`;
-        }).join('');
+    /* 自訂欄位渲染 */
+    function renderCustomFieldHeaders() {
+        const tr = document.getElementById('tableHeadRow');
+        const noteTh = document.getElementById('noteHeader');
+        tr.querySelectorAll('.custom-header').forEach(el => el.remove());
+
+        CUSTOM_FIELDS.forEach(f => {
+            const th = document.createElement('th');
+            th.className = 'custom-header';
+            th.innerText = f.label;
+            tr.insertBefore(th, noteTh);
+        });
     }
 
-    /* === 我的最愛顏色 === */
-    function openFavColorModal() {
-        renderFavColorList();
-        document.getElementById('favColorModal').style.display = 'flex';
-    }
-
-    function renderFavColorList() {
-        const container = document.getElementById('favColorList');
-        container.innerHTML = FAV_COLORS.map((c, idx) => `
-            <div style="text-align:center;">
-                <input type="color" value="${c}" onchange="updateFavColor(${idx}, this.value)" style="width:100%; height:40px; border:none; border-radius:8px; cursor:pointer; background:${c};">
-                <div style="font-size:10px; color:var(--text-dim); margin-top:4px;">最愛 ${idx + 1}</div>
-            </div>
-        `).join('');
-    }
-
-    function updateFavColor(idx, color) {
-        FAV_COLORS[idx] = color;
-        localStorage.setItem('warehouse_fav_colors', JSON.stringify(FAV_COLORS));
-        renderFavColorList();
-        renderAddColorPalette();
-        renderSlotColorToolbar();
-        showToast('🎨 已更新最愛顏色');
+    function renderAddFormCustomFields() {
+        const container = document.getElementById('addCustomFieldsContainer');
+        container.innerHTML = '';
+        CUSTOM_FIELDS.forEach(f => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'btn custom-add-field';
+            input.dataset.key = f.key;
+            input.placeholder = f.label;
+            container.appendChild(input);
+        });
     }
 
     function renderAddColorPalette() {
-        const el = document.getElementById('addColorPalette');
-        if (!el) return;
-        el.innerHTML = FAV_COLORS.map(c => `<div onclick="document.getElementById('addColor').value='${c}'" title="${c}" style="width:20px; height:20px; border-radius:50%; background:${c}; cursor:pointer; border:1px solid var(--border);"></div>`).join('');
+        const container = document.getElementById('addColorPalette');
+        if (!container) return;
+        container.innerHTML = FAV_COLORS.map(c => 
+            `<div onclick="document.getElementById('addColor').value='${c}'" style="width:18px; height:18px; border-radius:50%; background:${c}; cursor:pointer; border:1px solid white;"></div>`
+        ).join('');
     }
 
-    function openNoteStatusEditModal(itemId) {
+    /* 熟成天數對應的連動計算 */
+    function handleAddAgingInput() {
+        // 可擴充自動根據輸入天數推算目標日期
+    }
+
+    function handleEditAgingInput() {
+    }
+
+    /* CRUD 表單操作 (表單送出) */
+    async function submitFormAction(actionType) {
+        if (!currentUser || currentUser.role === 'guest') {
+            alert('訪客無權限執行新增操作！');
+            return;
+        }
+
+        const zName = document.getElementById('addZone').value;
+        const floor = document.getElementById('addFloor').value;
+        const pos = parseInt(document.getElementById('addPos').value, 10);
+        const name = document.getElementById('addName').value.trim();
+        const batch = document.getElementById('addBatch').value.trim();
+        const date = document.getElementById('addDate').value;
+        const agingDays = document.getElementById('addAging').value;
+        const note = document.getElementById('addNote').value.trim();
+        const color = document.getElementById('addColor').value;
+
+        if (!pos || !name) {
+            alert('請填寫完整「儲位號」與「產品名稱」！');
+            return;
+        }
+
+        let agingDateStr = '';
+        if (agingDays && !isNaN(parseInt(agingDays))) {
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + parseInt(agingDays));
+            agingDateStr = targetDate.toISOString().slice(0, 10);
+        }
+
+        const customFields = {};
+        document.querySelectorAll('.custom-add-field').forEach(input => {
+            customFields[input.dataset.key] = input.value.trim();
+        });
+
+        const newItem = {
+            id: 'item_' + Date.now(),
+            zone: zName,
+            floor: floor,
+            pos: pos,
+            name: name,
+            batch: batch,
+            date: date,
+            aging: agingDays,
+            agingDate: agingDateStr,
+            note: note,
+            color: color,
+            customFields: customFields,
+            createdAt: new Date().toISOString(),
+            logs: []
+        };
+
+        document.getElementById('loader').style.display = 'flex';
+
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                const rowToInsert = {
+                    id: newItem.id,
+                    zone: newItem.zone,
+                    floor: newItem.floor,
+                    pos: newItem.pos,
+                    name: newItem.name,
+                    batch: newItem.batch,
+                    date: newItem.date,
+                    aging: newItem.aging,
+                    aging_date: newItem.agingDate,
+                    note: newItem.note,
+                    color: newItem.color,
+                    custom_fields: newItem.customFields,
+                    created_at: newItem.createdAt,
+                    logs: []
+                };
+                const { error } = await supabaseClient.from(getTableName()).insert([rowToInsert]);
+                if (error) throw error;
+            } catch (err) {
+                console.error('雲端寫入失敗，改存本機：', err);
+                showToast('⚠️ 雲端寫入失敗，已暫存至本機');
+            }
+        }
+
+        inventory.unshift(newItem);
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+
+        document.getElementById('loader').style.display = 'none';
+        showToast('✅ 入庫建檔成功！');
+
+        // 清空表單
+        document.getElementById('addPos').value = '';
+        document.getElementById('addName').value = '';
+        document.getElementById('addBatch').value = '';
+        document.getElementById('addDate').value = '';
+        document.getElementById('addAging').value = '';
+        document.getElementById('addNote').value = '';
+        document.querySelectorAll('.custom-add-field').forEach(input => input.value = '');
+
+        renderVisual();
+        renderTable();
+    }
+
+    /* 開啟與編輯資料 */
+    function openItemEditModal(id) {
         if (!currentUser || currentUser.role !== 'admin') return;
-        const item = inventory.find(x => String(x.id) === String(itemId));
+        const item = inventory.find(x => x.id === id);
         if (!item) return;
 
-        document.getElementById('editNoteStatusItemId').value = itemId;
+        document.getElementById('editItemId').value = item.id;
+        renderEditZoneSelects(item.zone);
+        renderEditFloorSelects(item.floor);
+        document.getElementById('editPos').value = item.pos;
+        document.getElementById('editName').value = item.name;
+        document.getElementById('editBatch').value = item.batch || '';
+        document.getElementById('editDate').value = item.date || '';
+        document.getElementById('editAging').value = item.aging || '';
+        document.getElementById('editNote').value = item.note || '';
+        document.getElementById('editColor').value = item.color || '#06b6d4';
+
+        const container = document.getElementById('editCustomFieldsContainer');
+        container.innerHTML = '';
+        CUSTOM_FIELDS.forEach(f => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'btn custom-edit-field';
+            input.dataset.key = f.key;
+            input.placeholder = f.label;
+            input.value = item.customFields?.[f.key] || '';
+            container.appendChild(input);
+        });
+
+        document.getElementById('itemEditModal').style.display = 'flex';
+    }
+
+    function renderEditZoneSelects(selectedZone) {
+        const el = document.getElementById('editZone');
+        el.innerHTML = '';
+        getEffectiveZones().forEach(z => {
+            let opt = document.createElement('option');
+            opt.value = z.name; opt.textContent = z.name;
+            el.appendChild(opt);
+        });
+        if (selectedZone) el.value = selectedZone;
+    }
+
+    function renderEditFloorSelects(selectedFloor) {
+        const el = document.getElementById('editFloor');
+        el.innerHTML = '';
+        const maxF = Math.max(...getEffectiveZones().map(z => Number(z.floors) || 1));
+        for(let i=1; i<=maxF; i++) {
+            let opt = document.createElement('option');
+            opt.value = i + 'F'; opt.textContent = i + 'F';
+            el.appendChild(opt);
+        }
+        if (selectedFloor) el.value = selectedFloor;
+    }
+
+    async function saveItemEdit() {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const id = document.getElementById('editItemId').value;
+        const item = inventory.find(x => x.id === id);
+        if (!item) return;
+
+        item.zone = document.getElementById('editZone').value;
+        item.floor = document.getElementById('editFloor').value;
+        item.pos = parseInt(document.getElementById('editPos').value, 10);
+        item.name = document.getElementById('editName').value.trim();
+        item.batch = document.getElementById('editBatch').value.trim();
+        item.date = document.getElementById('editDate').value;
+        item.aging = document.getElementById('editAging').value;
+        item.note = document.getElementById('editNote').value.trim();
+        item.color = document.getElementById('editColor').value;
+
+        if (item.aging && !isNaN(parseInt(item.aging))) {
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + parseInt(item.aging));
+            item.agingDate = targetDate.toISOString().slice(0, 10);
+        } else {
+            item.agingDate = '';
+        }
+
+        item.customFields = item.customFields || {};
+        document.querySelectorAll('.custom-edit-field').forEach(input => {
+            item.customFields[input.dataset.key] = input.value.trim();
+        });
+
+        document.getElementById('loader').style.display = 'flex';
+
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                await supabaseClient.from(getTableName()).update({
+                    zone: item.zone,
+                    floor: item.floor,
+                    pos: item.pos,
+                    name: item.name,
+                    batch: item.batch,
+                    date: item.date,
+                    aging: item.aging,
+                    aging_date: item.agingDate,
+                    note: item.note,
+                    color: item.color,
+                    custom_fields: item.customFields
+                }).eq('id', item.id);
+            } catch (err) { console.error('雲端更新失敗：', err); }
+        }
+
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+
+        closeModal('itemEditModal');
+        showToast('✅ 庫存資料更新成功！');
+        renderVisual();
+        renderTable();
+    }
+
+    async function deleteItem(id) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        if (!confirm('確定要刪除這筆庫存資料嗎？刪除後無法恢復！')) return;
+
+        document.getElementById('loader').style.display = 'flex';
+
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                await supabaseClient.from(getTableName()).delete().eq('id', id);
+            } catch (err) { console.error('雲端刪除失敗：', err); }
+        }
+
+        inventory = inventory.filter(x => x.id !== id);
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
+        document.getElementById('loader').style.display = 'none';
+
+        showToast('🗑️ 已成功刪除庫存資料！');
+        renderVisual();
+        renderTable();
+    }
+
+    /* 編輯備註與狀態彈窗功能 */
+    function openNoteStatusEditModal(id) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        const item = inventory.find(x => x.id === id);
+        if (!item) return;
+
+        document.getElementById('editNoteStatusItemId').value = item.id;
         document.getElementById('editStatusTagInput').value = item.statusText || '';
         document.getElementById('editNoteInput').value = item.note || '';
+
         document.getElementById('noteStatusEditModal').style.display = 'flex';
     }
 
     async function saveNoteAndStatus() {
         if (!currentUser || currentUser.role !== 'admin') return;
         const id = document.getElementById('editNoteStatusItemId').value;
-        const item = inventory.find(x => String(x.id) === String(id));
+        const item = inventory.find(x => x.id === id);
         if (!item) return;
 
-        const newStatus = document.getElementById('editStatusTagInput').value.trim();
-        const newNote = document.getElementById('editNoteInput').value.trim();
-
-        item.statusText = newStatus;
-        item.note = newNote;
+        item.statusText = document.getElementById('editStatusTagInput').value.trim();
+        item.note = document.getElementById('editNoteInput').value.trim();
 
         document.getElementById('loader').style.display = 'flex';
+
         if (supabaseClient && !isOfflineMode) {
             try {
-                await supabaseClient.from(getTableName()).update({ statusText: newStatus, note: newNote }).eq('id', id);
-            } catch (err) { console.error('同步雲端失敗', err); }
+                await supabaseClient.from(getTableName()).update({
+                    status_text: item.statusText,
+                    note: item.note
+                }).eq('id', item.id);
+            } catch (err) { console.error('雲端更新失敗：', err); }
         }
 
         localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
         document.getElementById('loader').style.display = 'none';
+
         closeModal('noteStatusEditModal');
-        showToast('💾 備註與狀態已更新！');
+        showToast('✅ 備註與狀態更新成功！');
         renderTable();
     }
 
@@ -1863,143 +2089,83 @@
         await saveNoteAndStatus();
     }
 
-    async function deleteNoteAndStatus(itemId) {
-        if (!currentUser || currentUser.role !== 'admin') return;
-        if (!confirm('確定要刪除/清空此筆項目的備註與狀態嗎？')) return;
-
-        const item = inventory.find(x => String(x.id) === String(itemId));
-        if (!item) return;
-
-        item.statusText = '';
-        item.note = '';
-
-        document.getElementById('loader').style.display = 'flex';
-        if (supabaseClient && !isOfflineMode) {
-            try {
-                await supabaseClient.from(getTableName()).update({ statusText: '', note: '' }).eq('id', itemId);
-            } catch (err) { console.error('同步雲端失敗', err); }
-        }
-
-        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-        document.getElementById('loader').style.display = 'none';
-        showToast('🗑️ 已清除備註與狀態！');
-        renderTable();
-    }
-
-    async function executeDirectRestock(itemId) {
-        const item = inventory.find(x => String(x.id) === String(itemId));
-        if (!item) return;
-
-        const targetName = (item.name || '').trim().toLowerCase();
-        const matches = inventory.filter(x => (x.name || '').trim().toLowerCase() === targetName);
-        const locations = matches.map(m => `${m.zone} ${m.floor}-${m.pos}`);
-
-        let resultMsg = "";
-        if (locations.length > 0) {
-            resultMsg = `[補貨相符庫位: ${locations.join(', ')}]`;
-        } else {
-            resultMsg = `[補貨搜尋: 無其他相符庫位]`;
-        }
-
-        if (item.note && item.note.trim()) {
-            item.note = `${item.note} ${resultMsg}`;
-        } else {
-            item.note = resultMsg;
-        }
-
-        if (!item.logs) item.logs = [];
-        item.logs.push({
-            type: 'restock',
-            category: '補貨',
-            message: `一鍵補貨搜尋結果寫入備註：${resultMsg}`,
-            user: currentUser.username,
-            time: new Date().toLocaleString('zh-TW')
-        });
-
-        document.getElementById('loader').style.display = 'flex';
-        if (supabaseClient && !isOfflineMode) {
-            try {
-                await supabaseClient.from(getTableName()).update({ note: item.note, logs: item.logs }).eq('id', itemId);
-            } catch (err) { console.error('雲端補貨同步失敗', err); }
-        }
-
-        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-        document.getElementById('loader').style.display = 'none';
-        showToast('📦 補貨結果已直接寫入備註欄位！');
-        renderTable();
-    }
-
+    /* 異常與補貨回報 */
     function openLogModal(itemId, type) {
         logModalContext = { itemId, type };
-        document.getElementById('logModalTitle').innerText = '📢 異常回報';
-        document.getElementById('logModalLabel').innerText = '說明與備註';
+        const isReport = type === 'report';
+        document.getElementById('logModalTitle').innerText = isReport ? '📣 異常回報' : '📦 補貨記錄';
+        document.getElementById('logCategoryGroup').style.display = isReport ? 'block' : 'none';
         document.getElementById('logMessage').value = '';
-        document.getElementById('logCategoryGroup').style.display = 'block';
         document.getElementById('logModal').style.display = 'flex';
     }
 
     async function submitLogEntry() {
         const { itemId, type } = logModalContext;
-        const message = document.getElementById('logMessage').value.trim();
-        const category = document.getElementById('logCategory').value;
-
-        // 只要有選擇「回報類別」下拉選單即可送出，不強制要求輸入文字說明；
-        // 僅在完全沒有類別、也沒有文字內容時才擋下（正常情況下下拉選單一定有預設值，此判斷主要作為保險）
-        if (!category && !message) { alert('請選擇回報類別或輸入說明內容'); return; }
-
-        const item = inventory.find(x => String(x.id) === String(itemId));
+        const item = inventory.find(x => x.id === itemId);
         if (!item) return;
-        if (!item.logs) item.logs = [];
 
-        const logItem = {
-            type,
-            category,
-            message,
+        const cat = type === 'report' ? document.getElementById('logCategory').value : '補貨';
+        const msg = document.getElementById('logMessage').value.trim();
+
+        const logEntry = {
+            id: 'log_' + Date.now(),
             user: currentUser.username,
-            time: new Date().toLocaleString('zh-TW')
+            type: cat,
+            message: msg,
+            timestamp: new Date().toLocaleString()
         };
-        item.logs.push(logItem);
-        item.statusText = `${category}`;
+
+        item.logs = item.logs || [];
+        item.logs.unshift(logEntry);
+        
+        // 若回報包含狀態更新，同步寫入狀態
+        if (type === 'report') {
+            item.statusText = cat;
+        }
 
         document.getElementById('loader').style.display = 'flex';
+
         if (supabaseClient && !isOfflineMode) {
             try {
-                const { error } = await supabaseClient.from(getTableName()).update({ logs: item.logs, statusText: item.statusText }).eq('id', itemId);
-                if (error) throw error;
-                showToast('📢 回報已送出並同步雲端');
-            } catch (err) {
-                alert(formatSupabaseColumnError(err, ['logs']));
-            }
-        } else {
-            showToast('📢 回報已記錄');
+                await supabaseClient.from(getTableName()).update({
+                    logs: item.logs,
+                    status_text: item.statusText
+                }).eq('id', item.id);
+            } catch (err) { console.error('雲端紀錄寫入失敗：', err); }
         }
-        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
 
+        localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
         document.getElementById('loader').style.display = 'none';
+
         closeModal('logModal');
+        showToast('📤 回報訊息已成功送出！');
         renderTable();
     }
 
-    function viewLogHistory(itemId) {
-        const item = inventory.find(x => String(x.id) === String(itemId));
+    function openLogHistoryModal(itemId) {
+        const item = inventory.find(x => x.id === itemId);
+        if (!item || !item.logs) return;
+
         const list = document.getElementById('logHistoryList');
-        if (!item || !item.logs || !item.logs.length) {
-            list.innerHTML = `<div style="color:var(--text-dim); font-size:13px;">尚無紀錄</div>`;
-        } else {
-            list.innerHTML = item.logs.slice().reverse().map(l => `
-                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:10px 14px;">
-                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim);">
-                        <span>📢 [${l.category || '回報'}] · ${l.user}</span>
-                        <span>${l.time}</span>
-                    </div>
-                    <div style="margin-top:6px; font-size:13px;">${l.message || ''}</div>
+        list.innerHTML = '';
+
+        item.logs.forEach(l => {
+            const div = document.createElement('div');
+            div.style.cssText = 'padding:10px; background:rgba(0,0,0,0.2); border-radius:10px; border:1px solid var(--border);';
+            div.innerHTML = `
+                <div style="display:flex; justify-space-between; font-size:12px; color:var(--primary);">
+                    <b>${l.type} - ${l.user}</b>
+                    <span>${l.timestamp}</span>
                 </div>
-            `).join('');
-        }
+                <div style="font-size:13px; margin-top:4px; color:var(--text-main);">${l.message || '(無詳細說明)'}</div>
+            `;
+            list.appendChild(div);
+        });
+
         document.getElementById('logHistoryModal').style.display = 'flex';
     }
 
-    /* === 自訂欄位管理 === */
+    /* 自訂欄位管理 */
     function openCustomFieldModal() {
         renderCustomFieldList();
         document.getElementById('customFieldModal').style.display = 'flex';
@@ -2007,407 +2173,102 @@
 
     function renderCustomFieldList() {
         const list = document.getElementById('customFieldList');
-        if (!CUSTOM_FIELDS.length) {
-            list.innerHTML = `<div style="color:var(--text-dim); font-size:13px;">尚無自訂欄位</div>`;
-            return;
-        }
-        list.innerHTML = CUSTOM_FIELDS.map((f, idx) => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:12px; border:1px solid var(--border);">
-                <div>
-                    <b>${f.label}</b>
-                    <div style="font-size:11px; color:var(--text-dim);">欄位 Key: ${f.key}</div>
-                </div>
-                <button class="btn-main" style="background:var(--danger); padding:4px 8px; font-size:11px;" onclick="removeCustomField(${idx})">🗑️ 刪除</button>
-            </div>
-        `).join('');
+        list.innerHTML = '';
+        CUSTOM_FIELDS.forEach((f, idx) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:10px;';
+            div.innerHTML = `
+                <span>${f.label}</span>
+                <button class="btn-main" style="padding:2px 8px; font-size:11px; background:var(--danger);" onclick="deleteCustomField(${idx})">🗑️ 刪除</button>
+            `;
+            list.appendChild(div);
+        });
     }
 
     function addCustomField() {
         const label = document.getElementById('cfNewLabel').value.trim();
-        if (!label) { alert('請輸入欄位名稱'); return; }
-
-        const key = 'field_' + Date.now();
-        CUSTOM_FIELDS.push({ label, key });
+        if (!label) return;
+        const key = 'cf_' + Date.now();
+        CUSTOM_FIELDS.push({ key, label });
         localStorage.setItem('warehouse_custom_fields', JSON.stringify(CUSTOM_FIELDS));
-
         document.getElementById('cfNewLabel').value = '';
         renderCustomFieldList();
-        renderAddFormCustomFields();
         renderCustomFieldHeaders();
+        renderAddFormCustomFields();
         renderTable();
-        showToast('⚙️ 已新增自訂欄位！');
+        showToast('✅ 已成功新增自訂欄位！');
     }
 
-    function removeCustomField(idx) {
-        if (!confirm('確定要刪除此自訂欄位嗎？（既有資料中的此欄位內容將不再顯示）')) return;
+    function deleteCustomField(idx) {
         CUSTOM_FIELDS.splice(idx, 1);
         localStorage.setItem('warehouse_custom_fields', JSON.stringify(CUSTOM_FIELDS));
         renderCustomFieldList();
-        renderAddFormCustomFields();
         renderCustomFieldHeaders();
+        renderAddFormCustomFields();
         renderTable();
-        showToast('🗑️ 已刪除自訂欄位');
+        showToast('🗑️ 已刪除自訂欄位！');
     }
 
-    function renderAddFormCustomFields() {
-        const container = document.getElementById('addCustomFieldsContainer');
-        if (!container) return;
-        if (!CUSTOM_FIELDS.length) {
-            container.innerHTML = '';
-            return;
-        }
-        container.innerHTML = CUSTOM_FIELDS.map(f => `
-            <input type="text" id="add_cf_${f.key}" placeholder="${f.label}" class="btn" title="${f.label}">
-        `).join('');
-    }
-
-    function renderCustomFieldHeaders() {
-        const tr = document.getElementById('tableHeadRow');
-        if (!tr) return;
-
-        tr.querySelectorAll('.custom-header-th').forEach(th => th.remove());
-        const batchTh = tr.querySelector('th:nth-child(5)');
-        if (!batchTh) return;
-
-        CUSTOM_FIELDS.forEach(f => {
-            const th = document.createElement('th');
-            th.className = 'custom-header-th';
-            th.innerText = f.label;
-            batchTh.insertAdjacentElement('afterend', th);
+    /* 我的最愛顏色管理 */
+    function openFavColorModal() {
+        const list = document.getElementById('favColorList');
+        list.innerHTML = '';
+        FAV_COLORS.forEach((c, idx) => {
+            const input = document.createElement('input');
+            input.type = 'color';
+            input.className = 'btn';
+            input.value = c;
+            input.style.cssText = 'padding:2px; height:40px; cursor:pointer;';
+            input.onchange = (e) => {
+                FAV_COLORS[idx] = e.target.value;
+                localStorage.setItem('warehouse_fav_colors', JSON.stringify(FAV_COLORS));
+                renderAddColorPalette();
+                showToast('🎨 最愛顏色已更新！');
+            };
+            list.appendChild(input);
         });
+        document.getElementById('favColorModal').style.display = 'flex';
     }
 
-    /* === 輔助與資料獲取函式 === */
-    function getTableName() { return CURRENT_TABLE; }
-    function getLocalCacheKey() { return 'warehouse_inventory_' + CURRENT_TABLE; }
-
-    function handleAddAgingInput() {
-        const agingInput = document.getElementById('addAging');
-        const days = parseInt(agingInput.value, 10);
-        if (!isNaN(days) && days > 0) {
-            const date = new Date();
-            date.setDate(date.getDate() + days);
-            document.getElementById('addDate').value = date.toISOString().slice(0, 10);
-        }
-    }
-
-    function handleEditAgingInput() {
-        const agingInput = document.getElementById('editAging');
-        const days = parseInt(agingInput.value, 10);
-        if (!isNaN(days) && days > 0) {
-            const date = new Date();
-            date.setDate(date.getDate() + days);
-            document.getElementById('editDate').value = date.toISOString().slice(0, 10);
-        }
-    }
-
-    function handleTableSelectChange() {
-        const select = document.getElementById('tableSelect');
-        CURRENT_TABLE = select.value;
-        localStorage.setItem('warehouse_current_table', CURRENT_TABLE);
-        renderZoneSelects();
-        renderFloorSelects();
-        renderMarquee();
-        fetchData();
-    }
-
-    function renderTableSelect() {
-        const select = document.getElementById('tableSelect');
-        if (!select) return;
-        select.innerHTML = TABLE_LIST.map(t => `<option value="${t}" ${t === CURRENT_TABLE ? 'selected' : ''}>${t}</option>`).join('');
-    }
-
-    function toggleNetworkMode() {
-        isOfflineMode = !isOfflineMode;
-        const btn = document.getElementById('netStatusBtn');
-        if (isOfflineMode) {
-            btn.innerText = '📴 離線模式';
-            btn.style.background = '#64748b';
-            showToast('📴 已切換至離線操作模式');
-        } else {
-            btn.innerText = '🌐 線上模式';
-            btn.style.background = '#10b981';
-            showToast('🌐 已恢復線上模式');
-            fetchData();
-        }
-    }
-
-    function showToast(msg) {
-        const toast = document.getElementById('syncToast');
-        if (!toast) return;
-        toast.innerText = msg;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
-    }
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-    }
-
-    function formatSupabaseColumnError(err, missingColumns = []) {
-        const message = err && err.message ? err.message : String(err);
-        if (message.includes('column') || message.includes('does not exist')) {
-            return `❌ Supabase 資料表 schema 不吻合，缺少欄位：[${missingColumns.join(', ')}]\n\n錯誤資訊：${message}`;
-        }
-        return `❌ 操作失敗：${message}`;
-    }
-
-    async function fetchData() {
-        const thisToken = ++FETCH_TOKEN;
-        document.getElementById('loader').style.display = 'flex';
-
-        if (isOfflineMode || !supabaseClient) {
-            const cached = localStorage.getItem(getLocalCacheKey());
-            inventory = cached ? JSON.parse(cached) : [];
-            document.getElementById('loader').style.display = 'none';
-            renderVisual();
-            renderTable();
-            return;
-        }
-
-        try {
-            const { data, error } = await supabaseClient.from(getTableName()).select('*');
-            if (thisToken !== FETCH_TOKEN) return;
-            if (error) throw error;
-
-            inventory = (data || []).map(item => ({
-                ...item,
-                customFields: typeof item.customFields === 'string' ? JSON.parse(item.customFields || '{}') : (item.customFields || {}),
-                logs: typeof item.logs === 'string' ? JSON.parse(item.logs || '[]') : (item.logs || [])
-            }));
-
-            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-            showToast('🔄 資料已成功同步雲端');
-        } catch (err) {
-            console.error('fetchData error:', err);
-            const cached = localStorage.getItem(getLocalCacheKey());
-            inventory = cached ? JSON.parse(cached) : [];
-            showToast('⚠️ 雲端同步失敗，已載入本機快取');
-        } finally {
-            if (thisToken === FETCH_TOKEN) {
-                document.getElementById('loader').style.display = 'none';
-                renderVisual();
-                renderTable();
-            }
-        }
-    }
-
-    /* === 提交表單: 新增/編輯 (新增支援「操作員提交申請」) === */
-    async function submitFormAction(actionType) {
-        if (!currentUser || currentUser.role === 'guest') {
-            alert('訪客權限無法進行資料變更');
-            return;
-        }
-
-        // 當為操作員且為新增時，導向「新增申請」
-        if (currentUser.role === 'operator' && actionType === 'add') {
-            openApplyModal(null, 'add');
-            return;
-        }
-
-        if (currentUser.role !== 'admin') {
-            alert('權限不足，無法直接操作此功能');
-            return;
-        }
-
-        const isAdd = actionType === 'add';
-        const prefix = isAdd ? 'add' : 'edit';
-
-        const zone = document.getElementById(prefix + 'Zone').value;
-        const floor = document.getElementById(prefix + 'Floor').value;
-        const pos = parseInt(document.getElementById(prefix + 'Pos').value, 10);
-        const name = document.getElementById(prefix + 'Name').value.trim();
-        const batch = document.getElementById(prefix + 'Batch').value.trim();
-        const date = document.getElementById(prefix + 'Date').value;
-        const aging = document.getElementById(prefix + 'Aging').value.trim();
-        const note = document.getElementById(prefix + 'Note').value.trim();
-        const color = document.getElementById(prefix + 'Color').value;
-
-        if (!zone || !floor || isNaN(pos) || !name) {
-            alert('請填寫完整庫位 (區域、樓層、儲位號) 及產品名稱');
-            return;
-        }
-
-        const customFieldsObj = {};
-        CUSTOM_FIELDS.forEach(f => {
-            const input = document.getElementById(prefix + '_cf_' + f.key);
-            if (input) customFieldsObj[f.key] = input.value.trim();
-        });
-
-        let agingDate = null;
-        if (aging) {
-            const days = parseInt(aging, 10);
-            if (!isNaN(days) && days > 0) {
-                const baseDate = new Date();
-                baseDate.setDate(baseDate.getDate() + days);
-                agingDate = baseDate.toISOString().slice(0, 10);
-            }
-        }
-
-        const payload = {
-            zone, floor, pos, name, batch, date, aging, agingDate, note, color,
-            customFields: customFieldsObj,
-            updatedAt: new Date().toISOString()
-        };
-
-        document.getElementById('loader').style.display = 'flex';
-
-        try {
-            if (isAdd) {
-                payload.id = 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-                payload.createdAt = new Date().toISOString();
-                payload.logs = [];
-                payload.statusText = '正常';
-
-                if (supabaseClient && !isOfflineMode) {
-                    const { error } = await supabaseClient.from(getTableName()).insert([payload]);
-                    if (error) throw error;
-                }
-                inventory.push(payload);
-                showToast('➕ 產品新增建檔成功！');
-            } else {
-                const id = document.getElementById('editItemId').value;
-                const idx = inventory.findIndex(x => String(x.id) === String(id));
-                if (idx !== -1) {
-                    inventory[idx] = { ...inventory[idx], ...payload };
-                    if (supabaseClient && !isOfflineMode) {
-                        const { error } = await supabaseClient.from(getTableName()).update(payload).eq('id', id);
-                        if (error) throw error;
-                    }
-                    showToast('💾 產品資料更新成功！');
-                }
-            }
-
-            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-            if (!isAdd) closeModal('itemEditModal');
-            
-            // 清空新增表單
-            if (isAdd) {
-                document.getElementById('addPos').value = '';
-                document.getElementById('addName').value = '';
-                document.getElementById('addBatch').value = '';
-                document.getElementById('addDate').value = '';
-                document.getElementById('addAging').value = '';
-                document.getElementById('addNote').value = '';
-                CUSTOM_FIELDS.forEach(f => {
-                    const el = document.getElementById('add_cf_' + f.key);
-                    if (el) el.value = '';
-                });
-            }
-
-            renderVisual();
-            renderTable();
-        } catch (err) {
-            console.error('submitFormAction error:', err);
-            alert(formatSupabaseColumnError(err, ['zone', 'floor', 'pos', 'name', 'batch', 'date', 'aging', 'agingDate', 'note', 'color', 'customFields']));
-        } finally {
-            document.getElementById('loader').style.display = 'none';
-        }
-    }
-
-    function openItemEditModal(itemId) {
-        if (!currentUser || currentUser.role !== 'admin') return;
-        const item = inventory.find(x => String(x.id) === String(itemId));
-        if (!item) return;
-
-        document.getElementById('editItemId').value = itemId;
-
-        // 渲染下拉
-        const zones = getEffectiveZones();
-        const editZoneSelect = document.getElementById('editZone');
-        editZoneSelect.innerHTML = zones.map(z => `<option value="${z.name}">${z.name}</option>`).join('');
-        editZoneSelect.value = item.zone;
-
-        const maxF = Math.max(...zones.map(z => Number(z.floors) || 1));
-        const editFloorSelect = document.getElementById('editFloor');
-        editFloorSelect.innerHTML = '';
-        for (let i = 1; i <= maxF; i++) {
-            editFloorSelect.innerHTML += `<option value="${i}F">${i}F</option>`;
-        }
-        editFloorSelect.value = item.floor;
-
-        document.getElementById('editPos').value = item.pos;
-        document.getElementById('editName').value = item.name || '';
-        document.getElementById('editBatch').value = item.batch || '';
-        document.getElementById('editDate').value = item.date || '';
-        document.getElementById('editAging').value = item.aging || '';
-        document.getElementById('editNote').value = item.note || '';
-        document.getElementById('editColor').value = item.color || '#06b6d4';
-
-        // 自訂欄位
-        const container = document.getElementById('editCustomFieldsContainer');
-        if (CUSTOM_FIELDS.length) {
-            container.innerHTML = CUSTOM_FIELDS.map(f => {
-                const val = (item.customFields && item.customFields[f.key]) ? item.customFields[f.key] : '';
-                return `<input type="text" id="edit_cf_${f.key}" value="${val}" placeholder="${f.label}" class="btn" title="${f.label}">`;
-            }).join('');
-        } else {
-            container.innerHTML = '';
-        }
-
-        document.getElementById('itemEditModal').style.display = 'flex';
-    }
-
-    function saveItemEdit() {
-        submitFormAction('edit');
-    }
-
-    async function deleteItem(itemId) {
-        if (!currentUser || currentUser.role !== 'admin') return;
-        if (!confirm('確定要永久刪除此筆庫存產品嗎？')) return;
-
-        document.getElementById('loader').style.display = 'flex';
-        try {
-            if (supabaseClient && !isOfflineMode) {
-                const { error } = await supabaseClient.from(getTableName()).delete().eq('id', itemId);
-                if (error) throw error;
-            }
-
-            inventory = inventory.filter(x => String(x.id) !== String(itemId));
-            localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-            showToast('🗑️ 庫存產品已刪除');
-            renderVisual();
-            renderTable();
-        } catch (err) {
-            console.error('deleteItem error:', err);
-            alert('刪除失敗：' + (err.message || err));
-        } finally {
-            document.getElementById('loader').style.display = 'none';
-        }
-    }
-
-    /* === 區域格局管理 === */
+    /* 區域管理功能 */
     function openZoneManageModal() {
+        if (!currentUser || currentUser.role !== 'admin') return;
         renderZoneManageList();
         document.getElementById('zoneManageModal').style.display = 'flex';
     }
 
     function renderZoneManageList() {
         const list = document.getElementById('zoneManageList');
+        list.innerHTML = '';
         const zones = getEffectiveZones();
-        list.innerHTML = zones.map((z, idx) => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:12px; border:1px solid var(--border);">
+
+        zones.forEach((z, idx) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:10px;';
+            div.innerHTML = `
                 <div>
-                    <b>${z.name}</b>
-                    <div style="font-size:12px; color:var(--text-dim);">${z.floors} 樓層 / 每層 ${z.perFloor} 儲位</div>
+                    <b>${z.name}</b> (${z.floors} 層 / 每層 ${z.perFloor} 儲位)
                 </div>
-                <button class="btn-main" style="background:var(--danger); padding:4px 8px; font-size:11px;" onclick="removeZoneEntry(${idx})">🗑️ 刪除</button>
-            </div>
-        `).join('');
+                <button class="btn-main" style="padding:2px 8px; font-size:11px; background:var(--danger);" onclick="deleteZoneEntry(${idx})">🗑️ 刪除</button>
+            `;
+            list.appendChild(div);
+        });
     }
 
     function addZoneEntry() {
+        if (!currentUser || currentUser.role !== 'admin') return;
         const name = document.getElementById('zmNewName').value.trim();
         const floors = parseInt(document.getElementById('zmNewFloors').value, 10);
         const perFloor = parseInt(document.getElementById('zmNewPerFloor').value, 10);
 
-        if (!name || isNaN(floors) || isNaN(perFloor)) {
-            alert('請填寫完整的區域名稱、樓層數與每層庫位數');
+        if (!name || !floors || !perFloor) {
+            alert('請填寫完整區域格局資訊！');
             return;
         }
 
-        const zones = getEffectiveZones();
+        let zones = TABLE_ZONE_SETUP[CURRENT_TABLE] || JSON.parse(JSON.stringify(getEffectiveZones()));
         zones.push({ name, floors, perFloor });
+
         TABLE_ZONE_SETUP[CURRENT_TABLE] = zones;
         localStorage.setItem('warehouse_table_zone_setup', JSON.stringify(TABLE_ZONE_SETUP));
 
@@ -2416,18 +2277,14 @@
         renderZoneSelects();
         renderFloorSelects();
         renderVisual();
-        showToast('🏭 新增區域格局成功！');
+        showToast('✅ 區域格局已更新！');
     }
 
-    function removeZoneEntry(idx) {
-        const zones = getEffectiveZones();
-        if (zones.length <= 1) {
-            alert('系統至少必須保留一個倉儲區域！');
-            return;
-        }
-        if (!confirm('確定要刪除此區域格局嗎？')) return;
-
+    function deleteZoneEntry(idx) {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        let zones = TABLE_ZONE_SETUP[CURRENT_TABLE] || JSON.parse(JSON.stringify(getEffectiveZones()));
         zones.splice(idx, 1);
+
         TABLE_ZONE_SETUP[CURRENT_TABLE] = zones;
         localStorage.setItem('warehouse_table_zone_setup', JSON.stringify(TABLE_ZONE_SETUP));
 
@@ -2435,134 +2292,114 @@
         renderZoneSelects();
         renderFloorSelects();
         renderVisual();
-        showToast('🗑️ 已刪除區域格局');
+        showToast('🗑️ 區域格局已刪除！');
     }
 
-    /* ============ 新增功能：操作員「新增 / 編輯 提交申請」 ============ */
-    let applyModalContext = { itemId: null, mode: 'add' };
-
-    function openApplyModal(itemId = null, mode = 'add') {
-        applyModalContext = { itemId, mode };
-        let applyModal = document.getElementById('applyModal');
-        
-        if (!applyModal) {
-            const modalHtml = `
-            <div id="applyModal" class="modal">
-                <div class="modal-content">
-                    <button class="modal-close-btn" onclick="closeModal('applyModal')">✖</button>
-                    <h3 id="applyModalTitle" style="margin-top:0; color:var(--primary);">📝 提交變更申請</h3>
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
-                        <select id="applyZone" class="btn"></select>
-                        <select id="applyFloor" class="btn"></select>
-                        <input type="number" id="applyPos" placeholder="儲位號" class="btn">
-                        <input type="text" id="applyName" placeholder="產品名稱" class="btn">
-                        <input type="text" id="applyBatch" placeholder="批號" class="btn">
-                        <input type="date" id="applyDate" class="btn" title="有效日期">
-                        <input type="number" id="applyAging" placeholder="熟成天數 (如: 45)" class="btn" title="熟成天數">
-                        <input type="text" id="applyNote" placeholder="申請事由/備註" class="btn">
-                    </div>
-                    <div style="display:flex; gap:10px; margin-top:15px;">
-                        <button class="btn-main" style="flex:1; background:var(--edit);" onclick="submitApplication()">📤 確定提交申請</button>
-                        <button class="btn-main" style="flex:1; background:#475569;" onclick="closeModal('applyModal')">取消</button>
-                    </div>
-                </div>
-            </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            applyModal = document.getElementById('applyModal');
-        }
-
-        const titleEl = document.getElementById('applyModalTitle');
-        titleEl.innerText = mode === 'add' ? '📝 提交 [新增庫存] 申請' : '📝 提交 [編輯庫存] 申請';
-
-        const zones = getEffectiveZones();
-        const applyZoneSelect = document.getElementById('applyZone');
-        applyZoneSelect.innerHTML = zones.map(z => `<option value="${z.name}">${z.name}</option>`).join('');
-
-        const maxF = Math.max(...zones.map(z => Number(z.floors) || 1));
-        const applyFloorSelect = document.getElementById('applyFloor');
-        applyFloorSelect.innerHTML = '';
-        for (let i = 1; i <= maxF; i++) {
-            applyFloorSelect.innerHTML += `<option value="${i}F">${i}F</option>`;
-        }
-
-        if (mode === 'edit' && itemId) {
-            const item = inventory.find(x => String(x.id) === String(itemId));
-            if (item) {
-                applyZoneSelect.value = item.zone;
-                applyFloorSelect.value = item.floor;
-                document.getElementById('applyPos').value = item.pos;
-                document.getElementById('applyName').value = item.name || '';
-                document.getElementById('applyBatch').value = item.batch || '';
-                document.getElementById('applyDate').value = item.date || '';
-                document.getElementById('applyAging').value = item.aging || '';
-                document.getElementById('applyNote').value = item.note || '';
-            }
-        } else {
-            document.getElementById('applyPos').value = '';
-            document.getElementById('applyName').value = '';
-            document.getElementById('applyBatch').value = '';
-            document.getElementById('applyDate').value = '';
-            document.getElementById('applyAging').value = '';
-            document.getElementById('applyNote').value = '';
-        }
-
-        applyModal.style.display = 'flex';
+    /* 多資料表切換控制 */
+    function renderTableSelect() {
+        const select = document.getElementById('tableSelect');
+        select.innerHTML = '';
+        TABLE_LIST.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t === 'inventory' ? '主要庫存表 (inventory)' : t;
+            select.appendChild(opt);
+        });
+        select.value = CURRENT_TABLE;
     }
 
-    async function submitApplication() {
-        const { itemId, mode } = applyModalContext;
-        const zone = document.getElementById('applyZone').value;
-        const floor = document.getElementById('applyFloor').value;
-        const pos = parseInt(document.getElementById('applyPos').value, 10);
-        const name = document.getElementById('applyName').value.trim();
-        const batch = document.getElementById('applyBatch').value.trim();
-        const date = document.getElementById('applyDate').value;
-        const aging = document.getElementById('applyNote').value.trim();
-        const note = document.getElementById('applyNote').value.trim();
+    function handleTableSelectChange() {
+        CURRENT_TABLE = document.getElementById('tableSelect').value;
+        localStorage.setItem('warehouse_current_table', CURRENT_TABLE);
+        renderZoneSelects();
+        renderFloorSelects();
+        renderMarquee();
+        fetchData();
+    }
 
-        if (!zone || !floor || isNaN(pos) || !name) {
-            alert('請填寫完整庫位 (區域、樓層、儲位號) 及產品名稱');
-            return;
-        }
+    function getTableName() {
+        return CURRENT_TABLE || 'inventory';
+    }
 
-        const applyData = {
-            type: mode,
-            itemId: itemId,
-            zone, floor, pos, name, batch, date, aging, note,
-            applicant: currentUser.username,
-            time: new Date().toLocaleString('zh-TW')
-        };
+    function getLocalCacheKey() {
+        return 'warehouse_data_' + getTableName();
+    }
 
-        if (mode === 'edit' && itemId) {
-            const item = inventory.find(x => String(x.id) === String(itemId));
-            if (item) {
-                if (!item.logs) item.logs = [];
-                item.logs.push({
-                    type: 'apply',
-                    category: '編輯申請',
-                    message: `申請變更內容：${name} (${zone} ${floor}-${pos}) - 事由: ${note}`,
-                    user: currentUser.username,
-                    time: new Date().toLocaleString('zh-TW')
-                });
-                item.statusText = '待審核';
+    /* 雲端 / 本機 資料取得 */
+    async function fetchData() {
+        const token = ++FETCH_TOKEN;
+        document.getElementById('loader').style.display = 'flex';
 
-                document.getElementById('loader').style.display = 'flex';
-                if (supabaseClient && !isOfflineMode) {
-                    try {
-                        await supabaseClient.from(getTableName()).update({ logs: item.logs, statusText: item.statusText }).eq('id', itemId);
-                    } catch (err) { console.error('同步申請失敗', err); }
-                }
+        if (supabaseClient && !isOfflineMode) {
+            try {
+                const { data, error } = await supabaseClient.from(getTableName()).select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+
+                if (token !== FETCH_TOKEN) return;
+
+                inventory = (data || []).map(row => ({
+                    id: row.id,
+                    zone: row.zone,
+                    floor: row.floor,
+                    pos: row.pos,
+                    name: row.name,
+                    batch: row.batch,
+                    date: row.date,
+                    aging: row.aging,
+                    agingDate: row.aging_date,
+                    note: row.note,
+                    color: row.color,
+                    statusText: row.status_text,
+                    customFields: row.custom_fields || {},
+                    createdAt: row.created_at,
+                    logs: row.logs || []
+                }));
+
                 localStorage.setItem(getLocalCacheKey(), JSON.stringify(inventory));
-                document.getElementById('loader').style.display = 'none';
+                showToast('🔄 已成功同步雲端最新資料！');
+            } catch (err) {
+                console.error('讀取雲端資料失敗，改用本機快取：', err);
+                inventory = JSON.parse(localStorage.getItem(getLocalCacheKey()) || '[]');
+                showToast('⚠️ 雲端同步失敗，已切換至本機快取');
             }
         } else {
-            // 新增申請：紀錄於 Log 並提示送出
-            showToast('📝 新增申請已提交給管理員審核！');
+            inventory = JSON.parse(localStorage.getItem(getLocalCacheKey()) || '[]');
         }
 
-        closeModal('applyModal');
-        showToast('📝 申請已成功送出！');
+        document.getElementById('loader').style.display = 'none';
+        renderVisual();
         renderTable();
+    }
+
+    function toggleNetworkMode() {
+        isOfflineMode = !isOfflineMode;
+        const btn = document.getElementById('netStatusBtn');
+        if (isOfflineMode) {
+            btn.innerText = '🔌 離線模式';
+            btn.style.background = '#64748b';
+            showToast('🔌 已切換為離線單機模式');
+        } else {
+            btn.innerText = '🌐 線上模式';
+            btn.style.background = '#10b981';
+            showToast('🌐 已恢復線上同步模式');
+            fetchData();
+        }
+    }
+
+    function openBackendSettings() {
+        startOnboardingWizard();
+        nextWizStep(3);
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('syncToast');
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
     }
 </script>
 </body>
