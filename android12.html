@@ -131,6 +131,61 @@
             .mobile-sort-select { display:block; }
         }
     </style>
+<script>
+/* =========================================================
+   🔒 系統防護：禁止右鍵／常見查看原始碼與開發者工具快捷鍵
+   ========================================================= */
+(function () {
+
+    // 禁止滑鼠右鍵選單
+    document.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }, true);
+
+    // 禁止常見快捷鍵
+    document.addEventListener('keydown', function (e) {
+
+        const key = (e.key || '').toLowerCase();
+
+        // F12
+        if (e.key === 'F12') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+        // Ctrl + Shift + I
+        // Ctrl + Shift + J
+        // Ctrl + Shift + C
+        if (e.ctrlKey && e.shiftKey &&
+            (key === 'i' || key === 'j' || key === 'c')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+        // Ctrl + U
+        if (e.ctrlKey && key === 'u') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+        // Mac：Command + Option + I/J/C
+        if (e.metaKey && e.altKey &&
+            (key === 'i' || key === 'j' || key === 'c')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+    }, true);
+
+})();
+</script>
+
 </head>
 <body>
 
