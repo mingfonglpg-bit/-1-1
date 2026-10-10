@@ -94,6 +94,34 @@
         .sync-toast.error { background:linear-gradient(135deg,#ef4444,#f59e0b); }
         #netStatusBtn { position:relative; }
 
+        /* 手機版：庫位排列自訂、入庫彈窗、批次功能收合 */
+        .mobile-only-control { display:none; }
+        #mobileAddModal .modal-content { max-width:560px; width:94%; padding:18px; }
+        #mobileAddModal h3 { margin-top:0; }
+        #mobileAddModal #add-entry-form { display:grid !important; grid-template-columns:1fr 1fr; gap:9px; }
+        #mobileAddModal #add-entry-form > * { min-width:0; width:100% !important; }
+        #mobileAddModal #add-entry-form button { grid-column:1 / -1; justify-content:center; }
+        #mobileBatchToggle { margin-top:10px; }
+        #mobileLayoutControls { display:none; gap:7px; align-items:center; flex-wrap:wrap; }
+        #mobileLayoutControls select, #mobileLayoutControls input { width:auto !important; padding:8px !important; }
+        @media screen and (max-width:768px) {
+          .mobile-only-control { display:inline-flex !important; }
+          #admin-panel #add-entry-form { display:none !important; }
+          #batch-control-panel { display:none !important; margin-top:8px !important; padding:10px !important; }
+          #batch-control-panel.mobile-batch-open { display:flex !important; }
+          #batch-control-panel > * { max-width:100%; }
+          #mobileLayoutControls { display:flex; width:100%; }
+          #visualSection { padding:12px !important; }
+          #visualSection > div:first-child { margin-bottom:12px !important; }
+          #visualSection > div:first-child > div:last-child { width:100%; flex-wrap:wrap; }
+          #vZone { flex:1; min-width:0; width:auto !important; }
+          #vFloor { width:72px !important; }
+          #visualGrid { gap:6px !important; }
+          .slot { min-width:0; font-size:10px; border-radius:7px; }
+          .slot span.count { font-size:8px; }
+        }
+
+
         /* ============ 手機版（螢幕寬度 ≤ 768px）RWD 樣式 ============
            把桌機版的表格 <table> 整個改造成「卡片式」排版：隱藏表頭，
            每一列變成一張卡片，只預設顯示「儲位位置」與「產品內容」兩欄，
@@ -376,7 +404,11 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn-main" onclick="openSlotAnalysis()">🤖 BOT3 庫位熱冷區分析</button><button type="button" class="btn-main" onclick="openReservationPanel()">📅 庫位預約／轉凍</button><button type="button" class="btn-main" onclick="openBot1Import()">🤖 BOT1 對帳匯入</button></div>
         <div id="reservationPanel" style="display:none;padding:12px;border:1px dashed var(--border);border-radius:12px;margin-bottom:12px"><b>📅 庫位預約／轉凍（冷藏 → 冷凍）</b><p style="font-size:12px;color:var(--text-dim)">指定冷藏庫來源儲位與冷凍庫目標儲位及預約時間。自動轉凍需要 GS 後端排程與明確的轉凍規則；此版先提供登記表單，不會在未確認規則時自動搬動庫存。</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px"><input id="reserveItemId" class="btn" placeholder="庫存資料 ID（要轉凍的品項）"><select id="reserveSourceZone" class="btn"><option value="冷藏庫-左">來源：冷藏庫-左</option><option value="冷藏庫-右">來源：冷藏庫-右</option></select><select id="reserveSourceFloor" class="btn"><option>1F</option><option>2F</option><option>3F</option><option>4F</option></select><input id="reserveSourcePos" type="number" class="btn" placeholder="冷藏來源儲位"><select id="reserveTargetZone" class="btn"><option value="極冷庫-左">轉入：極冷庫-左</option><option value="極冷庫-右">轉入：極冷庫-右</option></select><select id="reserveTargetFloor" class="btn"><option>1F</option><option>2F</option><option>3F</option><option>4F</option></select><input id="reserveTargetPos" type="number" class="btn" placeholder="冷凍目標儲位"><input id="reserveAt" type="datetime-local" class="btn"><input id="reserveNote" class="btn" placeholder="預約／轉凍備註"></div><button class="btn-main" style="margin-top:8px" onclick="saveReservationDraft()">儲存預約草稿</button><div id="reservationStatus" style="margin-top:8px;font-size:12px"></div></div>
         <div id="bot1ImportPanel" style="display:none;padding:12px;border:1px dashed var(--border);border-radius:12px;margin-bottom:12px"><b>🤖 BOT1：與 count1 庫存對帳</b><p style="font-size:12px;color:var(--text-dim)">請先從 count1 匯出 CSV/Excel，再選擇 CSV 檔。此瀏覽器無法直接讀取另一網站的內部資料；目前先支援 CSV 欄位比對。</p><input id="bot1CsvFile" type="file" accept=".csv,text/csv" class="btn"><button class="btn-main" onclick="runBot1CsvCheck()">開始對帳</button><button type="button" class="btn-main" style="background:#64748b" onclick="clearBot1Check()">清除比對</button><div id="bot1Result" style="margin-top:8px"></div></div>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
+        <div class="mobile-only-control" style="gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <button type="button" class="btn-main" onclick="openMobileAddModal()">＋ 入庫</button>
+            <button type="button" id="mobileBatchToggle" class="btn-main" style="background:#475569" onclick="toggleMobileBatchPanel()">☷ 批次</button>
+        </div>
+        <div id="add-entry-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
             <select id="addZone" class="btn"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成-左">乾式熟成-左</option><option value="乾式熟成-右">乾式熟成-右</option></select>
             <select id="addFloor" class="btn"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             <input type="number" id="addPos" placeholder="儲位" class="btn"><input type="text" id="addName" placeholder="產品" class="btn"><input type="text" id="addBatch" placeholder="批號" class="btn"><input type="date" id="addDate" class="btn"><input type="text" id="addNote" placeholder="備註" class="btn"><button onclick="submitFormAction('add')" class="btn-main">➕ 入庫</button>
@@ -394,6 +426,17 @@
 </div>
     </div>
 
+    <!-- 手機版入庫視窗：透過 JS 將原入庫表單移入，避免重複欄位 ID -->
+    <div id="mobileAddModal" class="modal" onclick="if(event.target===this)closeMobileAddModal()">
+      <div class="modal-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+          <h3>＋ 新增入庫</h3>
+          <button type="button" class="btn-main" style="background:#475569" onclick="closeMobileAddModal()">✕ 關閉</button>
+        </div>
+        <div id="mobileAddFormHost"></div>
+      </div>
+    </div>
+
     <!-- 庫位視覺化地圖：選擇區域/樓層後，用彩色方格顯示每個儲位的佔用/狀態，
          點擊方格可快速搜尋該儲位。平板端可左右滑動切換樓層（手機端不啟用） -->
     <section id="visualSection" style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 24px; border: 1px solid var(--border); touch-action: pan-y;">
@@ -406,6 +449,13 @@
                 <button id="colorModeBtn" onclick="toggleColorPickMode()" class="btn-main" style="display:none; background:#334155; padding:8px 12px; font-size:12px;">🎨 自訂顏色模式</button>
                 <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成-左">乾式熟成-左</option><option value="乾式熟成-右">乾式熟成-右</option><option value="流動庫位區">流動庫位區</option><option value="超儲區">超儲區</option></select>
                 <select id="vFloor" onchange="renderVisual()" class="btn" style="width:75px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
+            </div>
+            <div id="mobileLayoutControls" class="mobile-only-control">
+              <label for="mobileGridCols" style="font-size:12px;color:var(--text-dim);">手機排列</label>
+              <select id="mobileGridCols" class="btn" onchange="changeMobileGridLayout(this.value)">
+                <option value="4">4格 × 多排</option><option value="5">5格 × 多排</option><option value="6">6格 × 多排</option><option value="8">8格 × 多排</option><option value="custom">自訂格數 × 多排</option>
+              </select>
+              <input id="mobileGridCustomCols" type="number" class="btn" min="2" max="12" step="1" placeholder="輸入每排格數(2-12)" style="display:none;max-width:175px" onchange="saveCustomMobileGridCols()" onkeydown="if(event.key==='Enter')saveCustomMobileGridCols()">
             </div>
         </div>
         <div id="visualGrid" style="display:grid; gap:8px;"></div>
@@ -743,7 +793,7 @@
     const getZoneColor = (z) => ({ "極冷庫-左": "var(--color-polar-l)", "極冷庫-右": "var(--color-polar-r)", "冷藏庫-左": "var(--color-cool-l)", "冷藏庫-右": "var(--color-cool-r)", "常溫區": "var(--color-normal)" }[z] || "var(--primary)");
     // 將特殊字元轉成 HTML 實體，避免使用者輸入的搜尋關鍵字被當成 HTML 標籤執行（防 XSS）
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
-    function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; fetchData(); initTouchEvents(); }
+    function enterSystem() { document.getElementById('welcome-page').style.display='none'; document.getElementById('main-container').style.display='block'; initMobileGridControls(); applyMobileFormPlacement(); fetchData(); initTouchEvents(); }
 
     let savedUpdateTime = localStorage.getItem('warehouse_last_update_time') || '';
     let savedUpdateSeconds = localStorage.getItem('warehouse_last_update_sec') || '';
@@ -1180,6 +1230,62 @@
       document.querySelectorAll('#bot1ResultRows [data-bot1-tab]').forEach(el=>el.style.display=el.getAttribute('data-bot1-tab')===tab?'block':'none');
     }
 
+    // 手機版庫位排列設定：格數固定、排數自動依該區域庫位總數延伸。
+    function getMobileGridCols() {
+      const saved = Number(localStorage.getItem('warehouse_mobile_grid_cols_v1') || 5);
+      return Math.max(2, Math.min(12, Number.isFinite(saved) && saved ? saved : 5));
+    }
+    function initMobileGridControls() {
+      const sel=document.getElementById('mobileGridCols'), custom=document.getElementById('mobileGridCustomCols');
+      if(!sel||!custom)return;
+      const cols=getMobileGridCols();
+      const presets=[4,5,6,8];
+      sel.value=presets.includes(cols)?String(cols):'custom';
+      custom.style.display=sel.value==='custom'?'inline-block':'none';
+      custom.value=cols;
+    }
+    function changeMobileGridLayout(value) {
+      const custom=document.getElementById('mobileGridCustomCols');
+      if(value==='custom') {
+        custom.style.display='inline-block';
+        custom.value=getMobileGridCols();
+        custom.focus();
+        alert('請輸入每排要顯示的庫位格數（2 至 12），下方排數會依庫位總數自動增加。');
+      } else {
+        custom.style.display='none';
+        localStorage.setItem('warehouse_mobile_grid_cols_v1',String(Math.max(2,Math.min(12,Number(value)||5))));
+        renderVisual();
+      }
+    }
+    function saveCustomMobileGridCols() {
+      const input=document.getElementById('mobileGridCustomCols');
+      let n=Number(input.value);
+      if(!Number.isInteger(n)||n<2||n>12){alert('請輸入 2 至 12 的整數格數。');input.value=getMobileGridCols();return;}
+      localStorage.setItem('warehouse_mobile_grid_cols_v1',String(n));
+      renderVisual();
+    }
+    function applyMobileFormPlacement() {
+      const form=document.getElementById('add-entry-form'), host=document.getElementById('mobileAddFormHost'), panel=document.getElementById('admin-panel');
+      if(!form||!host||!panel)return;
+      const mobile=window.matchMedia('(max-width: 768px)').matches;
+      if(mobile && form.parentElement!==host) host.appendChild(form);
+      else if(!mobile && form.parentElement!==panel) {
+        const batch=document.getElementById('batch-control-panel');
+        panel.insertBefore(form,batch);
+      }
+    }
+    function openMobileAddModal(){
+      applyMobileFormPlacement();
+      const modal=document.getElementById('mobileAddModal'); if(modal)modal.style.display='flex';
+    }
+    function closeMobileAddModal(){const modal=document.getElementById('mobileAddModal');if(modal)modal.style.display='none';}
+    function toggleMobileBatchPanel(){
+      const panel=document.getElementById('batch-control-panel'); if(!panel)return;
+      const open=panel.classList.toggle('mobile-batch-open');
+      const btn=document.getElementById('mobileBatchToggle'); if(btn)btn.textContent=open?'☷ 收合批次':'☷ 批次';
+    }
+    window.addEventListener('resize',()=>{applyMobileFormPlacement(); if(typeof renderVisual==='function')renderVisual();});
+
     function renderVisual() {
         const grid = document.getElementById('visualGrid');
         let zone = document.getElementById('vZone').value, floor = document.getElementById('vFloor').value;
@@ -1195,7 +1301,7 @@
         if (zone === "超儲區") zoneConfigs[zone] = { maxPos: 16, cols: 8 };
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
-        grid.style.gridTemplateColumns = window.innerWidth > 768 ? `repeat(${config.cols}, 1fr)` : `repeat(5, 1fr)`;
+        grid.style.gridTemplateColumns = window.innerWidth > 768 ? `repeat(${config.cols}, 1fr)` : `repeat(${getMobileGridCols()}, minmax(0, 1fr))`;
         grid.innerHTML = '';
         let occupied = 0;
 
