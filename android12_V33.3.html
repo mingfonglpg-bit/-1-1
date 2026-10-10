@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V33.3 </title>
+    <title>⚡ 倉儲庫位控管系統 V33.2 </title>
     <style>
         /* ============ 全域色彩／變數設定 ============
            統一定義主色、警告色、危險色、背景色等，之後所有樣式都透過
@@ -103,6 +103,7 @@
         #mobileAddModal #add-entry-form button { grid-column:1 / -1; justify-content:center; }
         #mobileBatchToggle { margin-top:10px; }
         #mobileLayoutControls { display:none; gap:7px; align-items:center; flex-wrap:wrap; }
+        #mobileGridCustomWrap { flex-wrap:wrap; }
         #mobileLayoutControls select, #mobileLayoutControls input { width:auto !important; padding:8px !important; }
         @media screen and (max-width:768px) {
           .mobile-only-control { display:inline-flex !important; }
@@ -111,13 +112,13 @@
           #batch-control-panel.mobile-batch-open { display:flex !important; }
           #batch-control-panel > * { max-width:100%; }
           #mobileLayoutControls { display:flex; width:100%; }
-          #visualSection { padding:12px !important; }
+          #visualSection { width:calc(100% + 40px); margin-left:-20px; padding:4px !important; border-radius:0 !important; border-left:0 !important; border-right:0 !important; box-sizing:border-box; }
           #visualSection > div:first-child { margin-bottom:12px !important; }
           #visualSection > div:first-child > div:last-child { width:100%; flex-wrap:wrap; }
           #vZone { flex:1; min-width:0; width:auto !important; }
           #vFloor { width:72px !important; }
-          #visualGrid { gap:6px !important; }
-          .slot { min-width:0; font-size:10px; border-radius:7px; }
+          #visualGrid { width:100%; gap:3px !important; grid-auto-rows:minmax(0,1fr); }
+          .slot { min-width:0; width:100%; box-sizing:border-box; font-size:10px; border-radius:5px; padding:4px 1px; overflow:hidden; }
           .slot span.count { font-size:8px; }
         }
 
@@ -154,7 +155,7 @@
             .report-label { margin-top: 0; margin-left: 5px; vertical-align: middle; }
             .action-btns { width: 100%; display: flex; gap: 6px; justify-content: space-between; }
             .action-btns .btn-main { flex: 1; text-align: center; justify-content: center; font-size: 12px; padding: 6px 2px !important; border-radius: 8px; min-height: 32px; }
-            #visualGrid { grid-template-columns: repeat(5, 1fr) !important; }
+            #visualGrid { width:100%; gap:3px !important; }
             #visualGrid .slot { aspect-ratio: 1; font-size: 12px; }
             .slot.empty-slot { border: 1px dashed rgba(203,213,225,.28) !important; background: transparent !important; color: rgba(203,213,225,.40) !important; box-shadow:none !important; }
             .slot .empty-label { display:block; margin-top:3px; font-size:10px; font-weight:400; color:rgba(203,213,225,.38); }
@@ -451,11 +452,16 @@
                 <select id="vFloor" onchange="renderVisual()" class="btn" style="width:75px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
             </div>
             <div id="mobileLayoutControls" class="mobile-only-control">
-              <label for="mobileGridCols" style="font-size:12px;color:var(--text-dim);">手機排列</label>
-              <select id="mobileGridCols" class="btn" onchange="changeMobileGridLayout(this.value)">
-                <option value="4">4格 × 多排</option><option value="5">5格 × 多排</option><option value="6">6格 × 多排</option><option value="8">8格 × 多排</option><option value="custom">自訂格數 × 多排</option>
+              <label style="font-size:12px;color:var(--text-dim);white-space:nowrap;">手機排列</label>
+              <select id="mobileGridCols" class="btn" aria-label="每排格數" onchange="changeMobileGridLayout(this.value)">
+                <option value="4">4 格 × 自動排</option><option value="5">5 格 × 自動排</option><option value="6">6 格 × 自動排</option><option value="8">8 格 × 自動排</option><option value="custom">自訂：格數 × 排數</option>
               </select>
-              <input id="mobileGridCustomCols" type="number" class="btn" min="2" max="12" step="1" placeholder="輸入每排格數(2-12)" style="display:none;max-width:175px" onchange="saveCustomMobileGridCols()" onkeydown="if(event.key==='Enter')saveCustomMobileGridCols()">
+              <div id="mobileGridCustomWrap" style="display:none;align-items:center;gap:5px;width:100%;">
+                <input id="mobileGridCustomCols" type="number" class="btn" min="0" max="22" step="1" placeholder="格數 0-22" aria-label="每排格數" style="width:42%;min-width:0;flex:1;" onchange="saveCustomMobileGridCols()" onkeydown="if(event.key==='Enter')saveCustomMobileGridCols()">
+                <span style="font-weight:bold;white-space:nowrap;">X</span>
+                <input id="mobileGridCustomRows" type="number" class="btn" min="0" max="22" step="1" placeholder="排數 0-22" aria-label="排數" style="width:42%;min-width:0;flex:1;" onchange="saveCustomMobileGridCols()" onkeydown="if(event.key==='Enter')saveCustomMobileGridCols()">
+                <small style="font-size:10px;color:var(--text-dim);width:100%;">格式：格數 X 排數；輸入 0 表示自動</small>
+              </div>
             </div>
         </div>
         <div id="visualGrid" style="display:grid; gap:8px;"></div>
@@ -1232,36 +1238,44 @@
 
     // 手機版庫位排列設定：格數固定、排數自動依該區域庫位總數延伸。
     function getMobileGridCols() {
-      const saved = Number(localStorage.getItem('warehouse_mobile_grid_cols_v1') || 5);
-      return Math.max(2, Math.min(12, Number.isFinite(saved) && saved ? saved : 5));
+      const saved=Number(localStorage.getItem('warehouse_mobile_grid_cols_v1'));
+      return Number.isInteger(saved)&&saved>=0&&saved<=22?saved:5;
+    }
+    function getMobileGridRows() {
+      const saved=Number(localStorage.getItem('warehouse_mobile_grid_rows_v1'));
+      return Number.isInteger(saved)&&saved>=0&&saved<=22?saved:0;
     }
     function initMobileGridControls() {
-      const sel=document.getElementById('mobileGridCols'), custom=document.getElementById('mobileGridCustomCols');
-      if(!sel||!custom)return;
-      const cols=getMobileGridCols();
+      const sel=document.getElementById('mobileGridCols'), wrap=document.getElementById('mobileGridCustomWrap');
+      const colInput=document.getElementById('mobileGridCustomCols'), rowInput=document.getElementById('mobileGridCustomRows');
+      if(!sel||!wrap||!colInput||!rowInput)return;
+      const cols=getMobileGridCols(), rows=getMobileGridRows();
       const presets=[4,5,6,8];
-      sel.value=presets.includes(cols)?String(cols):'custom';
-      custom.style.display=sel.value==='custom'?'inline-block':'none';
-      custom.value=cols;
+      sel.value=presets.includes(cols)&&rows===0?String(cols):'custom';
+      wrap.style.display=sel.value==='custom'?'flex':'none';
+      colInput.value=cols; rowInput.value=rows;
     }
     function changeMobileGridLayout(value) {
-      const custom=document.getElementById('mobileGridCustomCols');
+      const wrap=document.getElementById('mobileGridCustomWrap');
       if(value==='custom') {
-        custom.style.display='inline-block';
-        custom.value=getMobileGridCols();
-        custom.focus();
-        alert('請輸入每排要顯示的庫位格數（2 至 12），下方排數會依庫位總數自動增加。');
+        wrap.style.display='flex';
+        document.getElementById('mobileGridCustomCols').value=getMobileGridCols();
+        document.getElementById('mobileGridCustomRows').value=getMobileGridRows();
+        document.getElementById('mobileGridCustomCols').focus();
       } else {
-        custom.style.display='none';
-        localStorage.setItem('warehouse_mobile_grid_cols_v1',String(Math.max(2,Math.min(12,Number(value)||5))));
+        wrap.style.display='none';
+        localStorage.setItem('warehouse_mobile_grid_cols_v1',String(Math.max(1,Math.min(22,Number(value)||5))));
+        localStorage.setItem('warehouse_mobile_grid_rows_v1','0');
         renderVisual();
       }
     }
     function saveCustomMobileGridCols() {
-      const input=document.getElementById('mobileGridCustomCols');
-      let n=Number(input.value);
-      if(!Number.isInteger(n)||n<2||n>12){alert('請輸入 2 至 12 的整數格數。');input.value=getMobileGridCols();return;}
-      localStorage.setItem('warehouse_mobile_grid_cols_v1',String(n));
+      const colInput=document.getElementById('mobileGridCustomCols');
+      const rowInput=document.getElementById('mobileGridCustomRows');
+      const cols=Number(colInput.value), rows=Number(rowInput.value);
+      if(!Number.isInteger(cols)||cols<0||cols>22||!Number.isInteger(rows)||rows<0||rows>22){alert('請輸入 0 至 22 的整數；0 代表自動排列。');return;}
+      localStorage.setItem('warehouse_mobile_grid_cols_v1',String(cols));
+      localStorage.setItem('warehouse_mobile_grid_rows_v1',String(rows));
       renderVisual();
     }
     function applyMobileFormPlacement() {
@@ -1285,6 +1299,7 @@
       const btn=document.getElementById('mobileBatchToggle'); if(btn)btn.textContent=open?'☷ 收合批次':'☷ 批次';
     }
     window.addEventListener('resize',()=>{applyMobileFormPlacement(); if(typeof renderVisual==='function')renderVisual();});
+    document.addEventListener('DOMContentLoaded', initMobileGridControls);
 
     function renderVisual() {
         const grid = document.getElementById('visualGrid');
@@ -1301,7 +1316,15 @@
         if (zone === "超儲區") zoneConfigs[zone] = { maxPos: 16, cols: 8 };
         const config = zoneConfigs[zone] || { maxPos: 22, cols: 11 };
         document.getElementById('mapTitle').innerText = `${zone} - ${floor}`;
-        grid.style.gridTemplateColumns = window.innerWidth > 768 ? `repeat(${config.cols}, 1fr)` : `repeat(${getMobileGridCols()}, minmax(0, 1fr))`;
+        if (window.innerWidth > 768) {
+          grid.style.gridTemplateColumns = `repeat(${config.cols}, minmax(0, 1fr))`;
+          grid.style.gridTemplateRows = '';
+        } else {
+          const mobileCols=getMobileGridCols(), mobileRows=getMobileGridRows();
+          grid.style.gridTemplateColumns = mobileCols>0 ? `repeat(${mobileCols}, minmax(0, 1fr))` : 'repeat(auto-fit, minmax(44px, 1fr))';
+          grid.style.gridTemplateRows = mobileRows>0 ? `repeat(${mobileRows}, minmax(0, auto))` : '';
+          grid.style.gridAutoRows = 'minmax(0, auto)';
+        }
         grid.innerHTML = '';
         let occupied = 0;
 
