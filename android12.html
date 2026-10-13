@@ -791,7 +791,7 @@
         let adminDisplayStr = savedUpdateTime ? `最後更新時間：${savedUpdateTime}:${savedUpdateSeconds}` : "目前暫無變更紀錄";
 
         // 管理員與一般使用者看到不同的跑馬燈公告內容
-        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 ${adminDisplayStr}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。 ${displayStr}`;
+        document.getElementById('marqueeDisplay').innerText = isAdmin ? `⚙️ [管理端校正核心啟動] 儲位即時刷新同步完成。 ${adminDisplayStr}` : `🔔 系統公告：請務必依貨品原儲位編號進行入庫。冷藏牛無指定優先出SS，BY12/92S出貨前檢查有無發霉!!! ${displayStr}`;
     }
 
     // 每次資料刷新後自動執行：檢查所有品項的效期，幫即將到期(60日內)的品項
