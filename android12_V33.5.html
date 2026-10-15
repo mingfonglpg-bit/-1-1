@@ -111,6 +111,9 @@
         .slot-mark-controls-label { width:100%; font-size:11px; color:var(--text-dim); padding:2px 0; }
         .slot-mark-controls button { flex:1; min-width:0; padding:9px 8px; font-size:12px; justify-content:center; }
         .slot-mark-controls button.active { background:#0e7490!important; color:#fff!important; border-color:#22d3ee!important; }
+        /* 桌機／平板本機標記工具：放在自訂顏色按鈕左側，與管理員全域標記分開。 */
+        .desktop-slot-mark-controls { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .desktop-slot-mark-controls button { padding:8px 10px; font-size:12px; white-space:nowrap; }
         #globalSlotMarkControls { margin:0 0 12px; padding:10px; border:1px dashed var(--primary); border-radius:12px; }
         #visualGrid.slot-mark-mode .slot { cursor:crosshair!important; touch-action:manipulation; }
         #visualGrid.slot-mark-mode .slot:active { outline:3px solid #22d3ee; outline-offset:1px; }
@@ -120,6 +123,7 @@
         #mobileLayoutControls select, #mobileLayoutControls input { width:auto !important; padding:8px !important; }
         @media screen and (max-width:768px) {
           .mobile-only-control { display:inline-flex !important; }
+          .desktop-slot-mark-controls { display:none !important; }
           #admin-panel #add-entry-form { display:none !important; }
           #admin-panel.mobile-add-open #add-entry-form { display:grid !important; }
           #admin-panel.mobile-add-open #add-entry-form > * { min-width:0; max-width:100%; }
@@ -472,7 +476,11 @@
                 <b id="mapTitle" style="color:var(--primary);">載入中...</b>
                 <div id="floorEmptyCount" class="empty-count-badge">🔲 空庫位: --</div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <div id="desktopSlotLocalMarkControls" class="desktop-slot-mark-controls" aria-label="本機離線庫位標記工具">
+                    <button id="desktopSlotLocalMarkModeBtn" type="button" class="btn-main" style="background:#0e7490" onclick="toggleLocalSlotMarkMode()">📍 庫位標記（離線版）</button>
+                    <button id="desktopSlotLocalMarkClearBtn" type="button" class="btn-main" style="background:#475569" onclick="clearLocalSlotMarks()">🧹 清除標記（離線版）</button>
+                </div>
                 <button id="colorModeBtn" onclick="toggleColorPickMode()" class="btn-main" style="display:none; background:#334155; padding:8px 12px; font-size:12px;">🎨 自訂顏色模式</button>
                 <select id="vZone" onchange="renderVisual()" class="btn" style="width:120px;"><option value="極冷庫-左">極冷庫-左</option><option value="極冷庫-右">極冷庫-右</option><option value="冷藏庫-左">冷藏庫-左</option><option value="冷藏庫-右">冷藏庫-右</option><option value="常溫區">常溫區</option><option value="乾式熟成-左">乾式熟成-左</option><option value="乾式熟成-右">乾式熟成-右</option><option value="流動庫位區">流動庫位區</option><option value="超儲區">超儲區</option></select>
                 <select id="vFloor" onchange="renderVisual()" class="btn" style="width:75px;"><option value="1F">1F</option><option value="2F">2F</option><option value="3F">3F</option><option value="4F">4F</option></select>
@@ -1115,8 +1123,13 @@
       if(globalSlotMarkMode) alert('已進入「全域標記」模式。點選庫位可透過 GS 標記／取消標記，其他使用者同步後也會看見。請保持網路連線。');
     }
     function updateSlotMarkModeUI(){
-      const localBtn=document.getElementById('slotLocalMarkModeBtn');
-      if(localBtn){localBtn.classList.toggle('active',localSlotMarkMode);localBtn.textContent=localSlotMarkMode?'✓ 本機標記中（點選庫位）':'📍 庫位標記';}
+      ['slotLocalMarkModeBtn','desktopSlotLocalMarkModeBtn'].forEach(id=>{
+        const localBtn=document.getElementById(id);
+        if(localBtn){
+          localBtn.classList.toggle('active',localSlotMarkMode);
+          localBtn.textContent=localSlotMarkMode?'✓ 本機標記中（點選庫位）':(id==='desktopSlotLocalMarkModeBtn'?'📍 庫位標記（離線版）':'📍 庫位標記');
+        }
+      });
       const globalBtn=document.getElementById('slotGlobalMarkModeBtn');
       if(globalBtn){globalBtn.classList.toggle('active',globalSlotMarkMode);globalBtn.textContent=globalSlotMarkMode?'✓ 全域標記中（點選庫位）':'📍 庫位標記';}
       const grid=document.getElementById('visualGrid');
