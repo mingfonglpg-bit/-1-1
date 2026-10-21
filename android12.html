@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 倉儲庫位控管系統 V33.5.5</title>
+    <title>⚡ 倉儲庫位控管系統 V33.5.6</title>
     <style>
         /* ============ 全域色彩／變數設定 ============
            統一定義主色、警告色、危險色、背景色等，之後所有樣式都透過
@@ -30,7 +30,7 @@
         .marquee-container { background: rgba(6, 182, 212, 0.1); border-radius: 12px; padding: 8px 15px; margin-bottom: 10px; overflow: hidden; white-space: nowrap; border: 1px solid rgba(6, 182, 212, 0.2); }
         .marquee-text { display: inline-block; animation: marquee 20s linear infinite; color: var(--primary); font-weight: 500; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        /* V33.5.5：主頁「庫位狀態」標題依維護規範做左至右流動變色 */
+        /* V33.5.6：主頁「庫位狀態」標題依維護規範做左至右流動變色 */
         .warehouse-title-flow { background:linear-gradient(90deg,#22d3ee,#34d399,#fbbf24,#a78bfa,#22d3ee); background-size:260% auto; color:transparent; -webkit-background-clip:text; background-clip:text; animation:warehouseTitleFlow 6s linear infinite; }
         @keyframes warehouseTitleFlow { to { background-position:260% center; } }
         /* 每日即期提醒橫幅：點擊可展開/收合下方「即期品明細字卡」區塊 */
@@ -149,7 +149,7 @@
         /* ============ 手機版（螢幕寬度 ≤ 768px）RWD 樣式 ============
            把桌機版的表格 <table> 整個改造成「卡片式」排版：隱藏表頭，
            每一列變成一張卡片，只預設顯示「儲位位置」與「產品內容」兩欄，
-           點擊卡片展開(.expanded)後才會顯示全部欄位。 */
+           點擊卡片展開(.expanded)後才會顯示全部欄位。(26.10.21) */
         @media screen and (max-width: 768px) {
             #f-15 { font-size: 0; } #f-15::before { content: "即期"; font-size: 13px; }
             #f-30 { font-size: 0; } #f-30::before { content: "30日"; font-size: 13px; }
@@ -390,7 +390,7 @@
  </div>
 </div>
 <div id="welcome-page" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; padding: 20px;">
-    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V33.5.5</span></h1>
+    <h1 style="letter-spacing: 4px; font-size: 2rem; margin-bottom: 30px;">倉儲庫位控管系統 <span style="color:#06b6d4">V33.5.6</span></h1>
     <button class="btn-main welcome-btn-v265" style="padding: 20px 80px; border-radius: 50px; font-size: 1rem;" onclick="enterSystem()">啟動系統</button>
 </div>
 
@@ -555,7 +555,7 @@
 </div>
 
 <script>
-    /* V33.5.5規範校正：手機網格選項、入庫收合與標題動畫；其他既有功能維持。 */
+    /* V33.5.6規範校正：手機網格選項、入庫收合與標題動畫；其他既有功能維持。 */
     /* ============ 全域設定與狀態變數 ============ */
     // 後端資料來源：Google Apps Script 部署的 Web App 網址（讀取/寫入庫存資料）
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhCMcLu9LjctSz6NClcgUAJrNZMKuLZmMQpnLJ2oVPVy118-bR2Rxh8iemKUorOjJL/exec"; 
@@ -1785,7 +1785,7 @@
             payload = { action: 'edit', id: document.getElementById('editId').value, ...getFormFields('edit') };
             closeModal('editModal');
         } else if (actionType === 'report') {
-            payload = { action: 'report', id: currentId, type: document.getElementById('reportType').value, reason: document.getElementById('reportReason').value };
+            payload = { action: 'report', id: currentId, type: document.getElementById('reportType').value, reason: document.getElementById('reportReason').value, requestId: 'report_' + Date.now() + '_' + Math.floor(Math.random() * 1000000) };
             closeModal('reportModal');
         } else if (actionType === 'add') {
             payload = { action: 'add', ...getFormFields('add') };
@@ -2014,7 +2014,7 @@
     /* === 手機觸控手勢 === */
     // 在「庫位視覺化地圖」區域左右滑動時，自動切換樓層(1F↔2F↔3F↔4F)並重繪地圖
     function initTouchEvents() {
-        // V33.5.5：手機和平板在庫位地圖區左右滑動切換樓層；桌機維持原操作。
+        // V33.5.6：手機和平板在庫位地圖區左右滑動切換樓層；桌機維持原操作。
         let startX = 0, startY = 0;
         const sec = document.getElementById('visualSection');
         if (!sec || sec.dataset.v335TouchBound) return;
